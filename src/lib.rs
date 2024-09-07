@@ -1,4 +1,4 @@
-//#![no_std]
+#![no_std]
 #![warn(clippy::pedantic, clippy::allow_attributes_without_reason)]
 #![allow(
 	clippy::missing_panics_doc,
