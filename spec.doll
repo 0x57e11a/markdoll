@@ -61,7 +61,7 @@
 				block content allows far more flexibility in the content of tags, being able to put anything inside of them,
 				without markdoll interpreting it whatsoever, leaving that to that tag
 
-				however, this requires that the content
+				however, this requires that the content is indented one level further than the tag, to let the parser know what is and is not part of the content
 			]
 		&escape sequences
 			most parts of markdoll support escape sequences with the backslash character ([code:\\])
@@ -89,6 +89,7 @@
 						-	[em:can also include formatting]
 						-	lists can also
 							span multiple lines
+							if the same indent is kept
 
 				-	=	ordered
 					-	[codeblock(doll)::
@@ -102,6 +103,7 @@
 						=	[em:can also include formatting]
 						=	lists can also
 							span multiple lines
+							if the same indent is kept
 			]
 		&sections
 			a section is preceded by a heading, and its content is indented 1 level higher
