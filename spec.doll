@@ -291,9 +291,15 @@
 
 					-	=	[code:link]
 						-	[code:LINK_TAG]
-						-	create links
+						-	link to content
 						-	[codeblock:[link(https://github.com/0x57e11a/markdoll):markdoll]]
 						-	[link(https://github.com/0x57e11a/markdoll):markdoll]
+
+					-	=	[code:img]
+						-	[code:IMG_TAG]
+						-	insert images
+						-	[codeblock:[img(https://raw.githubusercontent.com/0x57e11a/markdoll/main/button.png):MADE WITH MARKDOLL]]
+						-	[img(https://raw.githubusercontent.com/0x57e11a/markdoll/main/button.png):MADE WITH MARKDOLL]
 
 					-	=	[code:def]
 						-	[code:DEF_TAG]
@@ -508,3 +514,4 @@
 								]
 							]
 				]
+	[img(https://raw.githubusercontent.com/0x57e11a/markdoll/main/button.png):MADE WITH MARKDOLL]

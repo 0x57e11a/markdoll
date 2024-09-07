@@ -1,6 +1,9 @@
 use {
 	crate::{args, ext::TagDefinition, tree::AST},
-	alloc::{boxed::Box, string::String},
+	alloc::{
+		boxed::Box,
+		string::{String, ToString},
+	},
 };
 
 #[derive(Debug)]
@@ -51,6 +54,54 @@ pub const LINK_TAG: TagDefinition = TagDefinition {
 		}
 
 		to.write_str("</a>").unwrap();
+	},
+};
+
+#[derive(Debug)]
+struct Image {
+	pub src: String,
+	pub alt: String,
+}
+
+/// `img` tag
+///
+/// insert an image
+///
+/// # arguments
+///
+/// - `src`\
+///   the url to source the image from
+///
+/// # content
+///
+/// text, alt text of the image
+pub const IMG_TAG: TagDefinition = TagDefinition {
+	key: "img",
+	parse: Some(|doll, mut args, text| {
+		args! {
+			doll, args;
+
+			args(src: String);
+			opt_args();
+			flags();
+			props();
+		};
+
+		Some(Box::new(Image {
+			src,
+			alt: text.to_string(),
+		}))
+	}),
+	emit: |_, to, content| {
+		let img = content.downcast_mut::<Image>().unwrap();
+
+		write!(
+			to,
+			"<img src='{}' alt='{}' />",
+			&html_escape::encode_safe(&img.src),
+			&html_escape::encode_safe(&img.alt)
+		)
+		.unwrap();
 	},
 };
 
