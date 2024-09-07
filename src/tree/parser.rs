@@ -864,7 +864,7 @@ mod tag {
 					} else {
 						ctx.doll.diagnostic_translations.pop().unwrap();
 					}
-					
+
 					break 'tag;
 				}
 
