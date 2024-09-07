@@ -1,7 +1,14 @@
 [package]
 name = "markdoll"
 version = "0.1.0"
+authors = ["0x57e11a"]
 edition = "2021"
+description = "a structured and extensible markup language"
+readme = "README.md"
+repository = "https://github.com/0x57e11a/markdoll"
+license = "MIT"
+keywords = ["markup"]
+categories = ["compilers", "no-std", "parser-implementation", "visualization"]
 
 [dependencies]
 hashbrown = "0.14.5"

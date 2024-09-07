@@ -4,17 +4,21 @@ use {
 	core::{cmp::Ordering, panic::Location},
 };
 
+/// an issue in the source
 #[derive(Debug)]
 pub struct Diagnostic {
+	/// whether this diagnostic should indicate invalid state
 	pub err: bool,
+	/// the location of this diagnostic in the source
 	pub at: usize,
+	/// the content of this diagnostic
 	pub code: &'static str,
 	#[cfg(debug_assertions)]
-	pub src: &'static Location<'static>,
+	pub(crate) src: &'static Location<'static>,
 }
 
 #[derive(Debug)]
-pub struct TagDiagnosticTranslation {
+pub(crate) struct TagDiagnosticTranslation {
 	pub src: Rc<str>,
 	pub indexed: Option<IndexedSrc>,
 	pub offset_in_parent: usize,
@@ -23,7 +27,7 @@ pub struct TagDiagnosticTranslation {
 }
 
 #[derive(Debug)]
-pub struct IndexedSrc {
+pub(crate) struct IndexedSrc {
 	lines: Vec<(usize, usize)>,
 	parent_lines: Vec<usize>,
 }
@@ -109,6 +113,7 @@ impl IndexedSrc {
 	}
 }
 
+/// render [`Diagnostic`]s to ariadne [`Reports`](ariadne::Report)
 #[must_use]
 #[allow(
 	clippy::range_plus_one,
