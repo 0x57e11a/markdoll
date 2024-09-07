@@ -8,7 +8,7 @@ readme = "README.md"
 repository = "https://github.com/0x57e11a/markdoll"
 license = "MIT"
 keywords = ["markup"]
-categories = ["compilers", "no-std", "parser-implementation", "visualization"]
+categories = ["compilers", "no-std", "parser-implementations", "visualization"]
 
 [dependencies]
 hashbrown = "0.14.5"
