@@ -9,7 +9,7 @@ use {
 		string::{String, ToString},
 		vec::Vec,
 	},
-	log::{error, trace},
+	log::error,
 };
 
 #[rustfmt::skip] // doing this so rust-analyzer doesnt merge it into the above import, making it invalid. see https://github.com/rust-lang/rust-analyzer/issues/17317
@@ -141,7 +141,7 @@ impl<'doll> Ctx<'doll> {
 			return;
 		}
 
-		trace!("terminating {:?}", self.stack.last());
+		t!("terminating", self.stack.last());
 
 		match self.stack.pop().expect("empty parse stack") {
 			StackPart::Root { .. } => {
@@ -648,7 +648,7 @@ pub fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 			}
 		}
 
-		trace!("line indent: {indent_level}");
+		t!("line", indent_level);
 
 		match ctx.stack.last_mut().unwrap() {
 			StackPart::Root { .. } | StackPart::List { .. } | StackPart::Section { .. } => {
@@ -951,7 +951,7 @@ pub fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 											ctx.inline.push((start, InlineItem::Text(text)));
 											ctx.inline.push((ctx.stream.index, InlineItem::Break));
 
-											break 'text;
+											break 'line;
 										}
 
 										Some('\t') => {
