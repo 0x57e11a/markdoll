@@ -27,7 +27,7 @@ pub const CODE_TAG: TagDefinition = TagDefinition {
 };
 
 #[derive(Debug)]
-pub struct Block {
+struct Block {
 	pub lang: Option<String>,
 	pub text: String,
 }
@@ -49,8 +49,6 @@ pub const CODEBLOCK_TAG: TagDefinition = TagDefinition {
 	parse: Some(|doll, mut args, text| {
 		args! {
 			doll, args;
-
-			on_fail(None);
 
 			args();
 			opt_args(lang: String);
@@ -74,7 +72,7 @@ pub const CODEBLOCK_TAG: TagDefinition = TagDefinition {
 			)
 			.unwrap();
 
-			if let Some(emitter) = doll.builtin_emitters.code_block.get(lang) {
+			if let Some(emitter) = doll.code_block.get(lang) {
 				(emitter)(doll, to, &code.text);
 			} else {
 				write!(

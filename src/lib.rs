@@ -1,9 +1,18 @@
+#![doc = "
+	a
+"]
 #![no_std]
-#![warn(clippy::pedantic, clippy::allow_attributes_without_reason)]
+#![forbid(unsafe_code)]
+#![warn(
+	clippy::pedantic,
+	clippy::allow_attributes_without_reason,
+	missing_docs
+)]
 #![allow(
 	clippy::missing_panics_doc,
 	reason = "lot of unwraps that shouldnt really be hit"
 )]
+#![allow(clippy::missing_errors_doc, reason = "capitalization :(")]
 #![allow(
 	clippy::match_wildcard_for_single_variants,
 	reason = "future may add more tags"
@@ -12,6 +21,9 @@
 	clippy::match_same_arms,
 	reason = "more confusing to merge in many cases"
 )]
+#![allow(clippy::wildcard_imports, reason = "used in parsing modules")]
+
+extern crate alloc;
 
 use {
 	crate::{
@@ -20,12 +32,11 @@ use {
 		ext::ExtensionSystem,
 		tree::{parser, AST},
 	},
-	alloc::vec::Vec,
+	alloc::{string::String, vec::Vec},
 	core::panic::Location,
 	hashbrown::HashMap,
 };
 
-#[macro_export]
 macro_rules! t {
 	($text:expr, $expr:expr) => {
 		match $expr {
@@ -43,20 +54,29 @@ macro_rules! t {
 	};
 }
 
-extern crate alloc;
+pub(crate) use t;
 
+/// emitting/translating diagnostics
 pub mod diagnostics;
+/// emitting output and default [`BuiltInEmitters`]
 pub mod emit;
+/// the extension system and standard library
 pub mod ext;
+/// syntax trees and parser
 pub mod tree;
 
 #[cfg(test)]
 mod tests;
 
+/// markdoll's main context
 #[derive(Debug)]
 pub struct MarkDoll {
+	/// the extension system, used to add tags
 	pub ext_system: ExtensionSystem,
+	/// the emitters for built in items and for formatting code blocks
 	pub builtin_emitters: BuiltInEmitters,
+	/// defines the syntax highlighting for the [`codeblock`](crate::ext::code::CODEBLOCK_TAG) tag
+	pub code_block: HashMap<String, fn(doll: &mut MarkDoll, to: To, text: &str)>,
 
 	pub(crate) ok: bool,
 	pub(crate) diagnostics: Vec<Diagnostic>,
@@ -64,6 +84,7 @@ pub struct MarkDoll {
 }
 
 impl MarkDoll {
+	/// construct an empty instance with no tags and the default [`BuiltInEmitters`]
 	#[must_use]
 	pub fn new() -> Self {
 		Self {
@@ -71,6 +92,7 @@ impl MarkDoll {
 				tags: HashMap::new(),
 			},
 			builtin_emitters: BuiltInEmitters::default(),
+			code_block: HashMap::new(),
 
 			ok: true,
 			diagnostics: Vec::new(),
@@ -78,22 +100,25 @@ impl MarkDoll {
 		}
 	}
 
-	pub fn begin(&mut self, input: &str) {
-		self.diagnostic_translations.push(TagDiagnosticTranslation {
-			src: input.into(),
-			indexed: None,
-			offset_in_parent: 0,
-			tag_pos_in_parent: 0,
-			indent: 0,
-		});
-	}
-
-	/// parse the input
+	/// parse the input into an AST
 	///
-	/// # Errors
+	/// # errors
 	///
 	/// if any error diagnostics are emitted, the resulting [`AST`] may be incomplete
+	///
+	/// # note
+	///
+	/// ensure that the `finish` method is called to reset the state *before* parsing a new file
 	pub fn parse(&mut self, input: &str) -> Result<AST, AST> {
+		if self.diagnostic_translations.is_empty() {
+			self.diagnostic_translations.push(TagDiagnosticTranslation {
+				src: input.into(),
+				indexed: None,
+				offset_in_parent: 0,
+				tag_pos_in_parent: 0,
+				indent: 0,
+			});
+		}
 		let ok = self.ok;
 
 		self.ok = true;
@@ -103,6 +128,11 @@ impl MarkDoll {
 		ast
 	}
 
+	/// emit the given [`AST`] to an output, returning true if it was successful
+	///
+	/// # note
+	///
+	/// ensure that the `finish` method is called to reset the state *before* parsing a new file
 	pub fn emit(&mut self, ast: &mut AST, to: To) -> bool {
 		let ok = self.ok;
 
@@ -115,12 +145,16 @@ impl MarkDoll {
 		self.ok
 	}
 
+	/// ensure that this method is called after parsing a source file, otherwise diagnostics may malfunction
 	pub fn finish(&mut self) -> Vec<Diagnostic> {
 		self.ok = true;
 		self.diagnostic_translations.clear();
 		core::mem::take(&mut self.diagnostics)
 	}
 
+	/// emit a diagnostic, mapping the position accordingly
+	///
+	/// pass [`usize::MAX`] to `at` to emit at the tag currently containing this context
 	#[track_caller]
 	pub fn diag(&mut self, err: bool, mut at: usize, code: &'static str) {
 		if err {

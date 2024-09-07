@@ -5,7 +5,7 @@ use {
 
 #[derive(Debug)]
 #[allow(clippy::struct_excessive_bools, reason = "required")]
-pub struct Emphasis {
+struct Emphasis {
 	pub italic: bool,
 	pub bold: bool,
 	pub underline: bool,
@@ -45,8 +45,6 @@ pub const EMPHASIS_TAG: TagDefinition = TagDefinition {
 	parse: Some(|doll, mut args, text| {
 		args! {
 			doll, args;
-
-			on_fail(None);
 
 			args();
 			opt_args();
@@ -128,7 +126,7 @@ pub const EMPHASIS_TAG: TagDefinition = TagDefinition {
 };
 
 #[derive(Debug)]
-pub struct Quote {
+struct Quote {
 	pub cite: Option<String>,
 	pub ast: AST,
 }
@@ -150,8 +148,6 @@ pub const QUOTE_TAG: TagDefinition = TagDefinition {
 	parse: Some(|doll, mut args, text| {
 		args! {
 			doll, args;
-
-			on_fail(None);
 
 			args();
 			opt_args(cite: String);

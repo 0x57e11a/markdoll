@@ -16,14 +16,14 @@ use {
 use alloc::vec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IndentKind {
+enum IndentKind {
 	Standard,
 	UnorderedList,
 	OrderedList,
 }
 
 #[derive(Debug)]
-pub enum StackPart {
+enum StackPart {
 	Root {
 		children: AST,
 	},
@@ -68,7 +68,7 @@ impl StackPart {
 }
 
 #[derive(Debug)]
-pub struct Stream {
+struct Stream {
 	pub src: Vec<char>,
 	pub index: usize,
 }
@@ -108,9 +108,9 @@ impl Stream {
 }
 
 #[derive(Debug)]
-pub struct Ctx<'doll> {
-	pub doll: &'doll mut MarkDoll,
-	pub stream: Stream,
+pub(crate) struct Ctx<'doll> {
+	doll: &'doll mut MarkDoll,
+	stream: Stream,
 	stack: Vec<StackPart>,
 	inline: Vec<(usize, InlineItem)>,
 	warned_cr: bool,
@@ -195,7 +195,7 @@ impl<'doll> Ctx<'doll> {
 						indent,
 					});
 
-				if let Some(content) = transform_tag_content(self, &args, &text, &tag) {
+				if let Some(content) = tag::transform_content(self, &args, &text, &tag) {
 					self.inline.push((
 						tag_at,
 						InlineItem::Tag(TagInvocation {
@@ -317,160 +317,156 @@ impl<'doll> Ctx<'doll> {
 	}
 }
 
-fn parse_tag_body_inline(ctx: &mut Ctx) -> Option<Rc<str>> {
-	let mut text = String::with_capacity(16);
-	let mut stack: usize = 0;
-
-	loop {
-		match ctx.stream.next() {
-			Some('\n') => {
-				ctx.err("unexpected newline");
-				break;
-			}
-
-			Some('\t') => {
-				ctx.err("unexpected indentation");
-			}
-
-			Some('\\') => match ctx.stream.next() {
-				Some('\n') => {
-					ctx.err("cannot escape newline in this context");
-					break;
-				}
-
-				Some('\t') => {
-					ctx.err("cannot escape indentation in this context");
-				}
-
-				Some(ch) => {
-					if ch == '\r' {
-						ctx.warn_cr();
-					}
-					text.push(ch);
-				}
-
-				None => {
-					ctx.err("unexpected EOI");
-					return None;
-				}
-			},
-
-			Some('[') => {
-				text.push('[');
-				stack += 1;
-			}
-			Some(']') => {
-				if stack > 0 {
-					text.push(']');
-					stack -= 1;
-				} else {
-					break;
-				}
-			}
-
-			Some(ch) => {
-				if ch == '\r' {
-					ctx.warn_cr();
-				}
-				text.push(ch);
-			}
-
-			None => {
-				ctx.err("unexpected EOI");
-				return None;
-			}
-		}
-	}
-
-	Some(Rc::from(text))
+enum ParseResult<T = ()> {
+	Ok(T),
+	NextLine,
+	Stop,
 }
 
-fn exit_indent_parse(ctx: &mut Ctx, indent_level: &mut usize) -> bool {
-	if let n @ 1.. = ctx.eat_all(' ') {
-		ctx.doll
-			.diag(false, ctx.stream.index - n, "erroneous leading spaces");
-	}
+mod indent {
+	use super::*;
 
-	if let Some(StackPart::TagBlockContent { tag_at, .. }) = ctx.stack.last() {
-		if *indent_level + 2 <= ctx.stack.len() && ctx.stream.try_eat(']') {
-			if *indent_level + 2 < ctx.stack.len() {
-				ctx.doll
-					.diag(true, *tag_at, "misaligned closing tag for this tag");
-			}
-
-			ctx.stack_terminate_top();
-
-			return false;
-		}
-	}
-
-	indent_drop(ctx, *indent_level);
-
-	true
-}
-
-fn indent_drop(ctx: &mut Ctx, to: usize) {
-	t!("[[[indent drop]]]", to);
-
-	while ctx.stack.len() > to + 1 {
-		let top = ctx.stack.last().unwrap();
-		if top.can_gracefully_terminate() {
-			t!("[[[terminate gracefully]]]");
-
-			ctx.flush_inline();
-			ctx.stack_terminate_top();
-		} else {
-			t!("[[[terminate non-gracefully]]]");
-
-			ctx.err_next(top.unterminated());
-
-			// forcibly terminate it anyways
-			ctx.stack_terminate_top();
-		}
-	}
-}
-
-fn transform_tag_content(
-	ctx: &mut Ctx,
-	args: &[String],
-	text: &str,
-	tag: &String,
-) -> Option<Box<dyn TagContent>> {
-	if let Some(def) = ctx.doll.ext_system.tags.get(&**tag) {
-		if let Some(parse) = def.parse {
-			(parse)(
-				ctx.doll,
-				args.iter().map(|string| &**string).collect(),
-				text,
-			)
-		} else {
+	/// called before returning to normal parsing
+	fn exit(ctx: &mut Ctx, indent_level: &mut usize) -> bool {
+		if let n @ 1.. = ctx.eat_all(' ') {
 			ctx.doll
-				.diag(true, usize::MAX, "tag does not support content");
-			None
+				.diag(false, ctx.stream.index - n, "erroneous leading spaces");
 		}
-	} else {
-		ctx.doll.diag(true, usize::MAX, "tag not defined");
-		None
+
+		// if parsing a block tag
+		if let Some(StackPart::TagBlockContent { tag_at, .. }) = ctx.stack.last() {
+			// and there's a closing bracket below its content indent
+			if *indent_level + 2 <= ctx.stack.len() && ctx.stream.try_eat(']') {
+				// if the indent isnt exactly one level below its content indent
+				if *indent_level + 2 < ctx.stack.len() {
+					ctx.doll
+						.diag(true, *tag_at, "misaligned closing tag for this tag");
+				}
+
+				// terminate it
+				ctx.stack_terminate_top();
+
+				return false;
+			}
+		}
+
+		// squish down to the indent level
+		squimsh_to(ctx, *indent_level);
+
+		true
 	}
-}
 
-/// parse input
-///
-/// # Errors
-///
-/// if any error diagnostics are emitted
-#[allow(clippy::too_many_lines, reason = "todo: later")]
-pub fn parse(mut ctx: Ctx) -> Result<AST, AST> {
-	t!("---- begin parse ----");
+	/// squish stack parts down to the provided indent level
+	///
+	/// `:pinched_hand::neocat_melt:`
+	fn squimsh_to(ctx: &mut Ctx, to: usize) {
+		t!("[[[indent drop]]]", to);
 
-	// significance tracks functionally-empty lines, splitting paragraphs at functionally-empty lines
-	let mut last_significant = false;
+		while ctx.stack.len() > to + 1 {
+			let top = ctx.stack.last().unwrap();
+			if top.can_gracefully_terminate() {
+				t!("[[[terminate gracefully]]]");
 
-	'main: loop {
-		t!("---------------line");
+				ctx.flush_inline();
+				ctx.stack_terminate_top();
+			} else {
+				t!("[[[terminate non-gracefully]]]");
 
-		// parse indent
-		let mut indent_level: usize = 0;
+				ctx.err_next(top.unterminated());
+
+				// forcibly terminate it anyways
+				ctx.stack_terminate_top();
+			}
+		}
+	}
+
+	/// more indentation than current
+	fn more(ctx: &mut Ctx, kind: IndentKind, indent_level: usize) {
+		ctx.flush_inline();
+
+		// more indent than the stack
+		if kind == IndentKind::Standard {
+			// cant come from nowhere
+			ctx.err("unexpected indentation");
+			ctx.stack.push(StackPart::Section {
+				pos: ctx.stream.index - 1,
+				level: indent_level + ctx.find_parent_indent(),
+				name: "<invalid indentation>".to_string(),
+				children: Vec::new(),
+			});
+		} else {
+			t!("[[[new list]]]");
+			ctx.stack.push(StackPart::List {
+				pos: ctx.stream.index - 2,
+				ordered: kind == IndentKind::OrderedList,
+				items: vec![Vec::new()],
+			});
+		}
+	}
+
+	/// less indentation than current
+	fn less(ctx: &mut Ctx, kind: IndentKind, indent_level: usize, last_significant: &mut bool) {
+		match (&mut ctx.stack[indent_level], kind) {
+			// new line in the same list element
+			(
+				StackPart::List { .. }
+				| StackPart::Section { .. }
+				| StackPart::TagBlockContent { .. },
+				IndentKind::Standard,
+			) => {
+				t!("[[[new line in current]]]");
+			}
+			(
+				StackPart::List { ordered, .. },
+				IndentKind::OrderedList | IndentKind::UnorderedList,
+			) => {
+				t!("[[[new list symbol]]]");
+				let new_ordered = kind == IndentKind::OrderedList;
+
+				if new_ordered == *ordered && *last_significant {
+					t!("[[[new list item]]]");
+					t!("inline", &ctx.inline);
+
+					ctx.flush_inline();
+					squimsh_to(ctx, indent_level);
+
+					let StackPart::List { items, .. } = &mut ctx.stack[indent_level] else {
+						unreachable!()
+					};
+					items.push(Vec::new());
+				} else {
+					t!("[[[new list, flush/term]]]");
+					ctx.flush_inline();
+					squimsh_to(ctx, indent_level - 1);
+					ctx.stack.push(StackPart::List {
+						pos: ctx.stream.index - 2,
+						ordered: new_ordered,
+						items: vec![Vec::new()],
+					});
+				}
+			}
+			(StackPart::Section { .. }, IndentKind::OrderedList | IndentKind::UnorderedList) => {
+				t!("[[[section end]]]");
+				squimsh_to(ctx, indent_level - 1);
+				ctx.stack.push(StackPart::List {
+					pos: ctx.stream.index - 2,
+					ordered: kind == IndentKind::OrderedList,
+					items: vec![Vec::new()],
+				});
+			}
+			(
+				StackPart::TagBlockContent { .. },
+				IndentKind::OrderedList | IndentKind::UnorderedList,
+			) => {
+				t!("[[[new list in section]]]");
+				ctx.err("unexpected list (expected indent)");
+			}
+			_ => unreachable!(),
+		}
+	}
+
+	pub fn parse(ctx: &mut Ctx, last_significant: &mut bool) -> ParseResult<usize> {
+		let mut indent_level = 0;
 
 		let tag_block_top = matches!(ctx.stack.last().unwrap(), StackPart::TagBlockContent { .. });
 
@@ -485,7 +481,7 @@ pub fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 					//ctx.stream.advance();
 
 					if !tag_block_top {
-						last_significant = false;
+						*last_significant = false;
 
 						t!("[[[flush insignificant]]");
 						ctx.flush_inline();
@@ -499,8 +495,8 @@ pub fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 					// if not just plain indent, need to eat the indent after it (or dont eat anything if no indent after it)
 					if ch != '\t' {
 						if !matches!(ctx.stream.lookahead(2), Some('\t' | '\n')) {
-							if !exit_indent_parse(&mut ctx, &mut indent_level) {
-								continue 'main;
+							if !exit(ctx, &mut indent_level) {
+								return ParseResult::NextLine;
 							}
 
 							break 'indent;
@@ -533,100 +529,11 @@ pub fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 					} else if indent_level + 1 > ctx.stack.len() {
 						t!("[[[higher indent]]]");
 
-						ctx.flush_inline();
-
-						// more indent than the stack
-						if kind == IndentKind::Standard {
-							// cant come from nowhere
-							ctx.err("unexpected indentation");
-							ctx.stack.push(StackPart::Section {
-								pos: ctx.stream.index - 1,
-								level: indent_level + ctx.find_parent_indent(),
-								name: "<invalid indentation>".to_string(),
-								children: Vec::new(),
-							});
-						} else {
-							t!("[[[new list]]]");
-							ctx.stack.push(StackPart::List {
-								pos: ctx.stream.index - 2,
-								ordered: kind == IndentKind::OrderedList,
-								items: vec![Vec::new()],
-							});
-						}
+						more(ctx, kind, indent_level);
 					} else {
 						t!("[[[lower indent]]]");
 
-						match (&mut ctx.stack[indent_level], kind) {
-							// new line in the same list element
-							(
-								StackPart::List { .. }
-								| StackPart::Section { .. }
-								| StackPart::TagBlockContent { .. },
-								IndentKind::Standard,
-							) => {
-								t!("[[[new line in current]]]");
-							}
-							(
-								StackPart::List { ordered, .. },
-								IndentKind::OrderedList | IndentKind::UnorderedList,
-							) => {
-								t!("[[[new list symbol]]]");
-								let new_ordered = kind == IndentKind::OrderedList;
-
-								if new_ordered == *ordered && last_significant {
-									t!("[[[new list item]]]");
-									t!("inline", &ctx.inline);
-									/*
-									items
-										.last_mut()
-										.unwrap()
-										.push(BlockItem::Inline(core::mem::take(&mut ctx.inline)));
-									*/
-
-									// new element of the list
-									//items.push(Vec::new());
-
-									ctx.flush_inline();
-									indent_drop(&mut ctx, indent_level);
-
-									let StackPart::List { items, .. } =
-										&mut ctx.stack[indent_level]
-									else {
-										unreachable!()
-									};
-									items.push(Vec::new());
-								} else {
-									t!("[[[new list, flush/term]]]");
-									ctx.flush_inline();
-									indent_drop(&mut ctx, indent_level - 1);
-									ctx.stack.push(StackPart::List {
-										pos: ctx.stream.index - 2,
-										ordered: new_ordered,
-										items: vec![Vec::new()],
-									});
-								}
-							}
-							(
-								StackPart::Section { .. },
-								IndentKind::OrderedList | IndentKind::UnorderedList,
-							) => {
-								t!("[[[section end]]]");
-								indent_drop(&mut ctx, indent_level - 1);
-								ctx.stack.push(StackPart::List {
-									pos: ctx.stream.index - 2,
-									ordered: kind == IndentKind::OrderedList,
-									items: vec![Vec::new()],
-								});
-							}
-							(
-								StackPart::TagBlockContent { .. },
-								IndentKind::OrderedList | IndentKind::UnorderedList,
-							) => {
-								t!("[[[new list in section]]]");
-								ctx.err("unexpected list (expected indent)");
-							}
-							_ => unreachable!(),
-						}
+						less(ctx, kind, indent_level, last_significant);
 					}
 				}
 
@@ -635,23 +542,379 @@ pub fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 						ctx.warn_cr();
 					}
 
-					if !exit_indent_parse(&mut ctx, &mut indent_level) {
-						continue 'main;
+					if !exit(ctx, &mut indent_level) {
+						return ParseResult::NextLine;
 					}
 
-					last_significant = true;
+					*last_significant = true;
 
 					break 'indent;
 				}
 
-				None => break 'main,
+				None => return ParseResult::Stop,
 			}
 		}
 
-		t!("line", indent_level);
+		ParseResult::Ok(indent_level)
+	}
+}
 
+mod tag {
+	use super::*;
+
+	/// parse inline tag text
+	fn parse_inline_text(ctx: &mut Ctx) -> Option<Rc<str>> {
+		let mut text = String::with_capacity(16);
+		let mut stack: usize = 0;
+
+		loop {
+			match ctx.stream.next() {
+				Some('\n') => {
+					ctx.err("unexpected newline");
+					break;
+				}
+
+				Some('\t') => {
+					ctx.err("unexpected indentation");
+				}
+
+				Some('\\') => match ctx.stream.next() {
+					Some('\n') => {
+						ctx.err("cannot escape newline in this context");
+						break;
+					}
+
+					Some('\t') => {
+						ctx.err("cannot escape indentation in this context");
+					}
+
+					Some(ch) => {
+						if ch == '\r' {
+							ctx.warn_cr();
+						}
+						text.push(ch);
+					}
+
+					None => {
+						ctx.err("unexpected EOI");
+						return None;
+					}
+				},
+
+				Some('[') => {
+					text.push('[');
+					stack += 1;
+				}
+				Some(']') => {
+					if stack > 0 {
+						text.push(']');
+						stack -= 1;
+					} else {
+						break;
+					}
+				}
+
+				Some(ch) => {
+					if ch == '\r' {
+						ctx.warn_cr();
+					}
+					text.push(ch);
+				}
+
+				None => {
+					ctx.err("unexpected EOI");
+					return None;
+				}
+			}
+		}
+
+		Some(Rc::from(text))
+	}
+
+	/// transform tag text to actual content
+	pub fn transform_content(
+		ctx: &mut Ctx,
+		args: &[String],
+		text: &str,
+		tag: &String,
+	) -> Option<Box<dyn TagContent>> {
+		if let Some(def) = ctx.doll.ext_system.tags.get(&**tag) {
+			if let Some(parse) = def.parse {
+				(parse)(
+					ctx.doll,
+					args.iter().map(|string| &**string).collect(),
+					text,
+				)
+			} else {
+				ctx.doll
+					.diag(true, usize::MAX, "tag does not support content");
+				None
+			}
+		} else {
+			ctx.doll.diag(true, usize::MAX, "tag not defined");
+			None
+		}
+	}
+
+	fn parse_arg(ctx: &mut Ctx) -> ParseResult<String> {
+		let mut arg = String::new();
+
+		'arg: loop {
+			match ctx.stream.next() {
+				Some('\n') => {
+					ctx.err("unexpected newline");
+					break 'arg;
+				}
+
+				Some('\t') => {
+					ctx.err("unexpected indentation");
+				}
+
+				Some(')') => break 'arg,
+
+				Some('\\') => match ctx.stream.next() {
+					Some('\n') => {
+						ctx.err("cannot escape newline in this context");
+						break 'arg;
+					}
+
+					Some('\t') => ctx.err("cannot escape indentation in this context"),
+
+					Some(ch) => {
+						if ch == '\r' {
+							ctx.warn_cr();
+						}
+						arg.push(ch);
+					}
+
+					None => {
+						ctx.err("unexpected EOI");
+						return ParseResult::Stop;
+					}
+				},
+
+				Some(ch) => {
+					if ch == '\r' {
+						ctx.warn_cr();
+					}
+					arg.push(ch);
+				}
+
+				None => {
+					ctx.err("unexpected EOI");
+					return ParseResult::Stop;
+				}
+			}
+		}
+
+		ParseResult::Ok(arg)
+	}
+
+	fn parse_content(
+		ctx: &mut Ctx,
+		tag: String,
+		args: Vec<String>,
+		start: usize,
+		indent_level: usize,
+	) -> ParseResult {
+		match ctx.stream.lookahead(1) {
+			Some('\n') => {
+				ctx.stream.skip();
+
+				ctx.err("unexpected newline");
+
+				return ParseResult::Ok(());
+			}
+
+			Some(':') => {
+				ctx.stream.skip();
+
+				ctx.stack.push(StackPart::TagBlockContent {
+					tag,
+					args,
+					text: String::new(),
+					tag_at: start,
+					offset_in_parent: ctx.stream.index + 1,
+					indent: indent_level + 1,
+				});
+
+				match ctx.stream.next() {
+					Some('\n') => {}
+
+					// not a newline
+					Some(ch) => {
+						if ch == '\r' {
+							ctx.warn_cr();
+						}
+
+						ctx.err("expected newline");
+
+						// eat characters until newline
+						if !ctx.eat_until_newline() {
+							ctx.err("unexpected EOI");
+							return ParseResult::Stop;
+						}
+					}
+
+					None => {
+						ctx.err("unexpected EOI");
+						return ParseResult::Stop;
+					}
+				}
+
+				return ParseResult::NextLine;
+			}
+
+			Some(ch) => {
+				if ch == '\r' {
+					ctx.warn_cr();
+				}
+
+				let offset_in_parent = ctx.stream.index;
+
+				if let Some(text) = parse_inline_text(ctx) {
+					ctx.doll
+						.diagnostic_translations
+						.push(TagDiagnosticTranslation {
+							src: Rc::clone(&text),
+							indexed: None,
+							offset_in_parent,
+							tag_pos_in_parent: start,
+							indent: 0,
+						});
+
+					if let Some(content) = transform_content(ctx, &args, &text, &tag) {
+						ctx.inline.push((
+							start,
+							InlineItem::Tag(TagInvocation {
+								tag,
+								args,
+								content,
+								diagnostic_translation: Some(
+									ctx.doll.diagnostic_translations.pop().unwrap(),
+								),
+							}),
+						));
+					} else {
+						ctx.doll.diagnostic_translations.pop().unwrap();
+					}
+				}
+			}
+
+			None => {
+				ctx.err("unexpected EOI");
+				return ParseResult::Stop;
+			}
+		}
+
+		ParseResult::Ok(())
+	}
+
+	pub fn parse(ctx: &mut Ctx, indent_level: usize) -> ParseResult {
+		let start = ctx.stream.index;
+		let mut tag = String::with_capacity(16);
+		let mut args = Vec::new();
+
+		'tag: loop {
+			match ctx.stream.next() {
+				Some('\n') => {
+					ctx.err("unexpected newline");
+					break 'tag;
+				}
+
+				Some('\t') => {
+					ctx.err("unexpected indentation");
+				}
+
+				Some('(') => match parse_arg(ctx) {
+					ParseResult::Ok(arg) => args.push(arg),
+					ParseResult::NextLine => return ParseResult::NextLine,
+					ParseResult::Stop => return ParseResult::Stop,
+				},
+
+				Some(':') => match parse_content(ctx, tag, args, start, indent_level) {
+					ParseResult::Ok(()) => break 'tag,
+					ParseResult::NextLine => return ParseResult::NextLine,
+					ParseResult::Stop => return ParseResult::Stop,
+				},
+
+				Some(']') => {
+					ctx.doll
+						.diagnostic_translations
+						.push(TagDiagnosticTranslation {
+							src: Rc::default(),
+							indexed: None,
+							offset_in_parent: ctx.stream.index - 1,
+							tag_pos_in_parent: start,
+							indent: 0,
+						});
+
+					if let Some(content) = transform_content(ctx, &args, "", &tag) {
+						ctx.inline.push((
+							start,
+							InlineItem::Tag(TagInvocation {
+								tag,
+								args,
+								content,
+								diagnostic_translation: Some(
+									ctx.doll.diagnostic_translations.pop().unwrap(),
+								),
+							}),
+						));
+					} else {
+						ctx.doll.diagnostic_translations.pop().unwrap();
+					}
+					
+					break 'tag;
+				}
+
+				Some(ch) => {
+					if ch == '\r' {
+						ctx.warn_cr();
+					}
+					tag.push(ch);
+				}
+
+				None => {
+					ctx.err("unexpected EOI");
+					return ParseResult::Stop;
+				}
+			}
+		}
+
+		ParseResult::Ok(())
+	}
+}
+
+/// parse input
+///
+/// # Errors
+///
+/// if any error diagnostics are emitted
+#[allow(clippy::too_many_lines, reason = "its not that big")]
+pub(crate) fn parse(mut ctx: Ctx) -> Result<AST, AST> {
+	t!("---- begin parse ----");
+
+	// significance tracks functionally-empty lines, splitting paragraphs at functionally-empty lines
+	let mut last_significant = false;
+
+	'main: loop {
+		t!("---- new line ----");
+
+		// parse indentation
+		let indent_level: usize = match indent::parse(&mut ctx, &mut last_significant) {
+			ParseResult::Ok(indent_level) => indent_level,
+			ParseResult::NextLine => continue 'main,
+			ParseResult::Stop => break 'main,
+		};
+
+		t!("line indentation", indent_level);
+
+		// decide what to do based off of stack top
 		match ctx.stack.last_mut().unwrap() {
+			// normal
 			StackPart::Root { .. } | StackPart::List { .. } | StackPart::Section { .. } => {
+				// section heads must be the start of their line
 				if ctx.stream.try_eat('&') {
 					let start = ctx.stream.index - 1;
 
@@ -689,241 +952,21 @@ pub fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 					continue 'main;
 				}
 
-				'line: loop {
+				// line loop
+				loop {
 					match ctx.stream.next() {
-						Some('\n') => {
-							break 'line;
-						}
+						Some('\n') => continue 'main,
 
-						Some('\t') => {
-							ctx.err("unexpected indentation");
-						}
+						Some('\t') => ctx.err("unexpected indentation"),
 
-						Some('[') => {
-							let start = ctx.stream.index;
-							let mut tag = String::with_capacity(16);
-							let mut args = Vec::new();
+						// parse a tag invocation
+						Some('[') => match tag::parse(&mut ctx, indent_level) {
+							ParseResult::Ok(()) => {}
+							ParseResult::NextLine => continue 'main,
+							ParseResult::Stop => break 'main,
+						},
 
-							'tag: loop {
-								match ctx.stream.next() {
-									Some('\n') => {
-										ctx.err("unexpected newline");
-										break 'tag;
-									}
-
-									Some('\t') => {
-										ctx.err("unexpected indentation");
-									}
-
-									Some('(') => {
-										let mut arg = String::new();
-
-										'arg: loop {
-											match ctx.stream.next() {
-												Some('\n') => {
-													ctx.err("unexpected newline");
-													break 'arg;
-												}
-
-												Some('\t') => {
-													ctx.err("unexpected indentation");
-												}
-
-												Some(')') => break 'arg,
-
-												Some('\\') => match ctx.stream.next() {
-													Some('\n') => {
-														ctx.err(
-															"cannot escape newline in this context",
-														);
-														break 'arg;
-													}
-
-													Some('\t') => ctx.err(
-														"cannot escape indentation in this context",
-													),
-
-													Some(ch) => {
-														if ch == '\r' {
-															ctx.warn_cr();
-														}
-														arg.push(ch);
-													}
-
-													None => {
-														ctx.err("unexpected EOI");
-														break 'main;
-													}
-												},
-
-												Some(ch) => {
-													if ch == '\r' {
-														ctx.warn_cr();
-													}
-													arg.push(ch);
-												}
-
-												None => {
-													ctx.err("unexpected EOI");
-													break 'main;
-												}
-											}
-										}
-
-										args.push(arg);
-									}
-
-									Some(':') => {
-										match ctx.stream.lookahead(1) {
-											Some('\n') => {
-												ctx.stream.skip();
-
-												ctx.err("unexpected newline");
-												break 'tag;
-											}
-
-											Some(':') => {
-												ctx.stream.skip();
-
-												ctx.stack.push(StackPart::TagBlockContent {
-													tag,
-													args,
-													text: String::new(),
-													tag_at: start,
-													offset_in_parent: ctx.stream.index + 1,
-													indent: indent_level + 1,
-												});
-
-												match ctx.stream.next() {
-													Some('\n') => {}
-
-													// not a newline
-													Some(ch) => {
-														if ch == '\r' {
-															ctx.warn_cr();
-														}
-
-														ctx.err("expected newline");
-
-														// eat characters until newline
-														if !ctx.eat_until_newline() {
-															ctx.err("unexpected EOI");
-															break 'main;
-														}
-													}
-
-													None => {
-														ctx.err("unexpected EOI");
-														break 'main;
-													}
-												}
-
-												break 'line;
-											}
-
-											Some(ch) => {
-												if ch == '\r' {
-													ctx.warn_cr();
-												}
-
-												let offset_in_parent = ctx.stream.index;
-
-												if let Some(text) = parse_tag_body_inline(&mut ctx)
-												{
-													ctx.doll.diagnostic_translations.push(
-														TagDiagnosticTranslation {
-															src: Rc::clone(&text),
-															indexed: None,
-															offset_in_parent,
-															tag_pos_in_parent: start,
-															indent: 0,
-														},
-													);
-
-													if let Some(content) = transform_tag_content(
-														&mut ctx, &args, &text, &tag,
-													) {
-														ctx.inline.push((
-															start,
-															InlineItem::Tag(TagInvocation {
-																tag,
-																args,
-																content,
-																diagnostic_translation: Some(
-																	ctx.doll
-																		.diagnostic_translations
-																		.pop()
-																		.unwrap(),
-																),
-															}),
-														));
-													} else {
-														ctx.doll
-															.diagnostic_translations
-															.pop()
-															.unwrap();
-													}
-
-													break 'tag;
-												}
-											}
-
-											None => {
-												ctx.err("unexpected EOI");
-												break 'main;
-											}
-										}
-									}
-
-									Some(']') => {
-										ctx.doll.diagnostic_translations.push(
-											TagDiagnosticTranslation {
-												src: Rc::default(),
-												indexed: None,
-												offset_in_parent: ctx.stream.index - 1,
-												tag_pos_in_parent: start,
-												indent: 0,
-											},
-										);
-
-										if let Some(content) =
-											transform_tag_content(&mut ctx, &args, "", &tag)
-										{
-											ctx.inline.push((
-												start,
-												InlineItem::Tag(TagInvocation {
-													tag,
-													args,
-													content,
-													diagnostic_translation: Some(
-														ctx.doll
-															.diagnostic_translations
-															.pop()
-															.unwrap(),
-													),
-												}),
-											));
-										} else {
-											ctx.doll.diagnostic_translations.pop().unwrap();
-										}
-										break 'tag;
-									}
-
-									Some(ch) => {
-										if ch == '\r' {
-											ctx.warn_cr();
-										}
-										tag.push(ch);
-									}
-
-									None => {
-										ctx.err("unexpected EOI");
-										break 'main;
-									}
-								}
-							}
-						}
-
+						// start parsing text
 						Some(ch) => {
 							if ch == '\r' {
 								ctx.warn_cr();
@@ -941,17 +984,18 @@ pub fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 										ctx.inline.push((start, InlineItem::Text(text)));
 										ctx.inline.push((ctx.stream.index, InlineItem::Split));
 
-										break 'line;
+										continue 'main;
 									}
 
 									Some('\t') => ctx.err("unexpected indentation"),
 
+									// escape sequence
 									Some('\\') => match ctx.stream.next() {
 										Some('\n') => {
 											ctx.inline.push((start, InlineItem::Text(text)));
 											ctx.inline.push((ctx.stream.index, InlineItem::Break));
 
-											break 'line;
+											continue 'main;
 										}
 
 										Some('\t') => {
@@ -973,6 +1017,7 @@ pub fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 										}
 									},
 
+									// back up, let the tag parser handle this
 									Some('[') => {
 										ctx.inline.push((start, InlineItem::Text(text)));
 										ctx.stream.back();
@@ -998,6 +1043,7 @@ pub fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 					}
 				}
 			}
+			// special, just insert content straight into the tag
 			StackPart::TagBlockContent { text: content, .. } => {
 				let mut warn_cr = false;
 

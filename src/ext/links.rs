@@ -4,7 +4,7 @@ use {
 };
 
 #[derive(Debug)]
-pub struct Link {
+struct Link {
 	pub href: String,
 	pub ast: AST,
 }
@@ -26,8 +26,6 @@ pub const LINK_TAG: TagDefinition = TagDefinition {
 	parse: Some(|doll, mut args, text| {
 		args! {
 			doll, args;
-
-			on_fail(None);
 
 			args(href: String);
 			opt_args();
@@ -78,8 +76,6 @@ pub const DEF_TAG: TagDefinition = TagDefinition {
 		args! {
 			doll, args;
 
-			on_fail(None);
-
 			args(href: String);
 			opt_args();
 			flags();
@@ -125,8 +121,6 @@ pub const REF_TAG: TagDefinition = TagDefinition {
 	parse: Some(|doll, mut args, text| {
 		args! {
 			doll, args;
-
-			on_fail(None);
 
 			args(href: String);
 			opt_args();

@@ -225,8 +225,6 @@ pub const TBLROW_TAG: TagDefinition = TagDefinition {
 			args! {
 				doll, args;
 
-				on_fail(None);
-
 				args();
 				opt_args();
 				flags(head);
@@ -272,8 +270,6 @@ pub const TBLCELL_TAG: TagDefinition = TagDefinition {
 		if let Ok(ast) = doll.parse(text) {
 			args! {
 				doll, args;
-
-				on_fail(None);
 
 				args();
 				opt_args();
