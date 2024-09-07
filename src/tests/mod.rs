@@ -36,8 +36,6 @@ pub fn test_syntax() {
 
 	println!("parse");
 
-	doll.begin(SRC);
-
 	let mut ok = true;
 
 	match doll.parse(SRC) {
