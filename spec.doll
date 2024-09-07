@@ -1,0 +1,138 @@
+&markdoll
+	this is markdoll
+
+	markdoll is an extensible markup language written in rust, made: by dolls, for dolls
+
+	&how is it different from other markup languages?
+		like HTML, markdoll is a tree shaped system. for example, headers always precede sections,
+		which have a defined ending point, an explicit hierarchy, rather than an implicit one
+	&specification
+		&whitespace
+			in markdoll, tab characters are significant, they help define sections and lists, and provide a boundary for block-content tags
+
+			markdoll specifically does [em:not] assign importance to spaces, but does prohibit them in certain cases
+
+			newlines are also very signficant:
+
+			-	unless the last character of the line is a backslash ([code:\\]), splitting text by a newline instead inserts a space
+			-	separating text/tags by an empty line splits it into two paragraphs
+			-	separating list elements by an empty line splits it into two lists
+		&tags
+			markdoll has a concept of "tags", which have a keyword and may choose to have arguments and content
+
+			tags can be written multiple ways:
+			[table::
+				=	=	kind
+					=	syntax
+					=	result
+
+				-	=	no-arg & no-content
+					-	[codeblock::
+							[sometag]
+						]
+					-	invokes [code:sometag], does not provide an argument or any content
+
+				-	=	arg & no-content
+					-	[codeblock::
+							[sometag(argument that can have any non-parenthesis tokens in it)]
+						]
+					-	invokes [code:sometag], providing the argument text, but no content
+
+				-	=	no-arg & content
+					-	[codeblock::
+							[sometag:content]
+							[sometag::
+								block content
+							]
+						]
+					-	invokes [code:sometag], does not provide an argument, but provides content[ref(tag-block-content)]
+
+				-	=	arg & content
+					-	[codeblock::
+							[sometag(argument that can have any non-parenthesis tokens in it):content]
+							[sometag(argument that can have any non-parenthesis tokens in it)::
+								block content
+							]
+						]
+					-	invokes [code:sometag], providing an argument and content[ref(tag-block-content)]
+			]
+
+			[def(tag-block-content)::
+				block content allows far more flexibility in the content of tags, being able to put anything inside of them,
+				without markdoll interpreting it whatsoever, leaving that to that tag
+
+				however, this requires that the content
+			]
+		&escape sequences
+			most parts of markdoll support escape sequences with the backslash character ([code:\\])
+
+			for example:
+			-	[code:[em:\\\\[\\\\]]] results in: [em:\\[\\]]
+			-	[code:hello \\[world\\]] results in: hello \[world]
+		&lists
+			unordered and ordered lists are also easy:
+
+			[table::
+				=	=	kind
+					=	syntax
+					=	result
+
+				-	=	unordered
+					-	[codeblock::
+							-	single line
+							-	*can also include formatting*
+							-	lists can also
+								span multiple lines
+								if the same indent is kept
+						]
+					-	-	single line
+						-	*can also include formatting*
+						-	lists can also
+							span multiple lines
+
+				-	=	ordered
+					-	[codeblock::
+							=	single line
+							=	*can also include formatting*
+							=	lists can also
+								span multiple lines
+								if the same indent is kept
+						]
+					-	=	single line
+						=	*can also include formatting*
+						=	lists can also
+							span multiple lines
+			]
+		&sections
+			a section is preceded by a heading, and its content is indented 1 level higher
+
+			[table::
+				=	=	syntax
+					=	result
+
+				-	-	[codeblock::
+							&hello
+								&world
+									content
+								goes
+							here
+						]
+					-	&hello
+							&world
+								content
+							goes
+						here
+			]
+
+			when emitting to HTML, it is not recommended to have more than one top-level section,
+			as multiple h1 elements causes accessibility issues
+	&extensibility
+		markdoll and its standard library emits HTML by default, but it doesn't have to!
+
+		markdoll does not load [em:any] tags automatically, all of them must be manually inserted.
+		the standard library all emit HTML, but their source code can be read and copied if a different result is required
+
+		&standard extensions
+			the standard library is located in the modules exported in [code:markdoll::ext]
+
+			TBD
