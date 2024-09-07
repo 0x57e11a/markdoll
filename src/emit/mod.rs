@@ -57,14 +57,14 @@ impl BuiltInEmitters {
 		if level <= 6 {
 			write!(
 				to,
-				"<section data-level='{level}'><h{level}>{}</h{level}>",
+				"<section data-level='{level}'><h{level}>{}</h{level}><div>",
 				&html_escape::encode_text(name)
 			)
 			.unwrap();
 		} else {
 			write!(
 				to,
-				"<section data-level='{level}'><div role='heading' aria-level='{level}'>{}</div>",
+				"<section data-level='{level}'><div role='heading' aria-level='{level}'>{}</div><div>",
 				&html_escape::encode_text(name)
 			)
 			.unwrap();
@@ -75,7 +75,7 @@ impl BuiltInEmitters {
 			child.emit(doll, to, block);
 		}
 
-		to.write_str("</section>").unwrap();
+		to.write_str("</div></section>").unwrap();
 	}
 
 	/// the default [`BlockItem::List`](crate::tree::BlockItem::List) emitter
