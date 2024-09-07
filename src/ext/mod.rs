@@ -10,14 +10,14 @@ use {
 	reason = "type is never mentioned outside of this struct, simple functions"
 )]
 pub struct TagDefinition {
-	/// The tag key
+	/// the tag key
 	pub key: &'static str,
 
-	/// Parse the tag. Return None to avoid being placed into the AST and emitting.
+	/// parse the tag. Return None to avoid being placed into the AST and emitting.
 	pub parse:
 		Option<fn(doll: &mut MarkDoll, arg: Vec<&str>, text: &str) -> Option<Box<dyn TagContent>>>,
 
-	/// Emit the tag content
+	/// emit the tag content
 	pub emit: fn(doll: &mut MarkDoll, to: To, content: &mut Box<dyn TagContent>),
 }
 

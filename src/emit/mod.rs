@@ -19,11 +19,11 @@ pub struct BuiltInEmitters {
 }
 
 impl BuiltInEmitters {
-	/// The default [`BlockItem::Inline`](crate::tree::BlockItem::Inline) emitter
+	/// the default [`BlockItem::Inline`](crate::tree::BlockItem::Inline) emitter
 	///
 	/// # Panics
 	///
-	/// If it could not write to the writer
+	/// if it could not write to the writer
 	pub fn default_inline(
 		doll: &mut MarkDoll,
 		to: To,
@@ -50,11 +50,11 @@ impl BuiltInEmitters {
 		}
 	}
 
-	/// The default [`BlockItem::Section`](crate::tree::BlockItem::Section) emitter
+	/// the default [`BlockItem::Section`](crate::tree::BlockItem::Section) emitter
 	///
 	/// # Panics
 	///
-	/// If it could not write to the writer
+	/// if it could not write to the writer
 	pub fn default_section(
 		doll: &mut MarkDoll,
 		to: To,
@@ -86,11 +86,11 @@ impl BuiltInEmitters {
 		to.write_str("</section>").unwrap();
 	}
 
-	/// The default [`BlockItem::List`](crate::tree::BlockItem::List) emitter
+	/// the default [`BlockItem::List`](crate::tree::BlockItem::List) emitter
 	///
 	/// # Panics
 	///
-	/// If it could not write to the writer
+	/// if it could not write to the writer
 	pub fn default_list(doll: &mut MarkDoll, to: To, ordered: bool, items: &mut [AST]) {
 		let kind = if ordered { "ol" } else { "ul" };
 		write!(to, "<{kind}>").unwrap();
