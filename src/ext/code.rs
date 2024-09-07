@@ -95,3 +95,6 @@ pub const CODEBLOCK_TAG: TagDefinition = TagDefinition {
 		}
 	},
 };
+
+/// all of this module's tags
+pub const TAGS: &[TagDefinition] = &[CODE_TAG, CODEBLOCK_TAG];

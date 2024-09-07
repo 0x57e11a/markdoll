@@ -292,3 +292,6 @@ pub const TBLCELL_TAG: TagDefinition = TagDefinition {
 		doll.diag(true, usize::MAX, "table(cell) outside of table");
 	},
 };
+
+/// all of this module's tags
+pub const TAGS: &[TagDefinition] = &[TBL_TAG, TBLROW_TAG, TBLCELL_TAG];

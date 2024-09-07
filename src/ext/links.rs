@@ -193,3 +193,6 @@ pub const REF_TAG: TagDefinition = TagDefinition {
 		write!(to, "<sup><a href='#ref-{href}'>[{href}]</a></sup>").unwrap();
 	},
 };
+
+/// all of this module's tags
+pub const TAGS: &[TagDefinition] = &[LINK_TAG, IMG_TAG, DEF_TAG, REF_TAG];

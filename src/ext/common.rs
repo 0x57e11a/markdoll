@@ -12,3 +12,6 @@ pub const COMMENT_TAG: TagDefinition = TagDefinition {
 	parse: Some(|_, _, _| None),
 	emit: |_, _, _| {},
 };
+
+/// all of this module's tags
+pub const TAGS: &[TagDefinition] = &[COMMENT_TAG];

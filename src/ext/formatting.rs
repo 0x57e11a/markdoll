@@ -186,3 +186,6 @@ pub const QUOTE_TAG: TagDefinition = TagDefinition {
 		to.write_str("</blockquote></figure>").unwrap();
 	},
 };
+
+/// all of this module's tags
+pub const TAGS: &[TagDefinition] = &[EMPHASIS_TAG, QUOTE_TAG];

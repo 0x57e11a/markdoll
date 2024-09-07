@@ -22,17 +22,11 @@ pub fn test_syntax() {
 	let mut out = String::new();
 
 	let mut doll = MarkDoll::new();
-	doll.ext_system.add_tag(ext::common::COMMENT_TAG);
-	doll.ext_system.add_tag(ext::formatting::EMPHASIS_TAG);
-	doll.ext_system.add_tag(ext::formatting::QUOTE_TAG);
-	doll.ext_system.add_tag(ext::code::CODE_TAG);
-	doll.ext_system.add_tag(ext::code::CODEBLOCK_TAG);
-	doll.ext_system.add_tag(ext::links::LINK_TAG);
-	doll.ext_system.add_tag(ext::links::DEF_TAG);
-	doll.ext_system.add_tag(ext::links::REF_TAG);
-	doll.ext_system.add_tag(ext::table::TBL_TAG);
-	doll.ext_system.add_tag(ext::table::TBLROW_TAG);
-	doll.ext_system.add_tag(ext::table::TBLCELL_TAG);
+	doll.ext_system.add_tags(ext::common::TAGS);
+	doll.ext_system.add_tags(ext::formatting::TAGS);
+	doll.ext_system.add_tags(ext::code::TAGS);
+	doll.ext_system.add_tags(ext::links::TAGS);
+	doll.ext_system.add_tags(ext::table::TAGS);
 
 	println!("parse");
 
