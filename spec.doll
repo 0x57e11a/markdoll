@@ -27,19 +27,19 @@
 					=	result
 
 				-	=	no-arg & no-content
-					-	[codeblock::
+					-	[codeblock(doll)::
 							[sometag]
 						]
 					-	invokes [code:sometag], does not provide an argument or any content
 
 				-	=	arg & no-content
-					-	[codeblock::
+					-	[codeblock(doll)::
 							[sometag(argument that can have any non-parenthesis tokens in it)]
 						]
 					-	invokes [code:sometag], providing the argument text, but no content
 
 				-	=	no-arg & content
-					-	[codeblock::
+					-	[codeblock(doll)::
 							[sometag:content]
 							[sometag::
 								block content
@@ -48,7 +48,7 @@
 					-	invokes [code:sometag], does not provide an argument, but provides content[ref(tag-block-content)]
 
 				-	=	arg & content
-					-	[codeblock::
+					-	[codeblock(doll)::
 							[sometag(argument that can have any non-parenthesis tokens in it):content]
 							[sometag(argument that can have any non-parenthesis tokens in it)::
 								block content
@@ -78,28 +78,28 @@
 					=	result
 
 				-	=	unordered
-					-	[codeblock::
+					-	[codeblock(doll)::
 							-	single line
-							-	*can also include formatting*
+							-	[em:can also include formatting]
 							-	lists can also
 								span multiple lines
 								if the same indent is kept
 						]
 					-	-	single line
-						-	*can also include formatting*
+						-	[em:can also include formatting]
 						-	lists can also
 							span multiple lines
 
 				-	=	ordered
-					-	[codeblock::
+					-	[codeblock(doll)::
 							=	single line
-							=	*can also include formatting*
+							=	[em:can also include formatting]
 							=	lists can also
 								span multiple lines
 								if the same indent is kept
 						]
 					-	=	single line
-						=	*can also include formatting*
+						=	[em:can also include formatting]
 						=	lists can also
 							span multiple lines
 			]
@@ -110,7 +110,7 @@
 				=	=	syntax
 					=	result
 
-				-	-	[codeblock::
+				-	-	[codeblock(doll)::
 							&hello
 								&world
 									content
@@ -135,4 +135,376 @@
 		&standard extensions
 			the standard library is located in the modules exported in [code:markdoll::ext]
 
-			TBD
+			&common
+				located in [code:markdoll::ext::common]
+
+				[table::
+					=	=	tag
+						=	import
+						=	description
+						=	syntax
+						=	result
+
+					-	[tc(head)(rows=2):[code://]]
+						[tc(rows=2):[code:COMMENT_TAG]]
+						[tc(rows=2):the comment tag is very simple, its content is not parsed and is excluded from the output]
+						-	[codeblock(doll)::
+								[//:this will not be included in the output]
+							]
+						-	[//:this will not be included in the output]
+					-	-	[codeblock(doll)::
+								[//::
+									this more complicated block comment will not be included in the output
+
+									whatsoever
+								]
+							]
+						-	[//::
+								this more complicated block comment will not be included in the output
+
+								whatsoever
+							]
+				]
+			&formatting
+				located in [code:markdoll::ext::formatting]
+
+				[table::
+					=	=	tag
+						=	import
+						=	description
+						=	syntax
+						=	result
+
+					-	[tc(head)(rows=8):[code:em]]
+						[tc(rows=8):[code:EMPHASIS_TAG]]
+						[tc(rows=8)::
+							apply one or more forms of emphasis to the content
+
+							flags:
+							-	i\
+								italics via `<em>`\
+								**default if no flags are specified**
+							-	b\
+								bold via `<strong>`
+							-	u\
+								underline via `<u>`
+							-	s\
+								strikethrough via `<s>`
+							-	h\
+								highlight via `<mark>`
+							-	q\
+								quote via `<q>`
+						]
+						-	[codeblock(doll):[em:italics]]
+						-	[em:italics]
+					-	-	[codeblock(doll):[em(i):italics (explicit)]]
+						-	[em(i):italics (explicit)]
+					-	-	[codeblock(doll):[em(b):bold]]
+						-	[em(b):bold]
+					-	-	[codeblock(doll):[em(u):underline]]
+						-	[em(u):underline]
+					-	-	[codeblock(doll):[em(s):strikethrough]]
+						-	[em(s):strikethrough]
+					-	-	[codeblock(doll):[em(h):highlight]]
+						-	[em(h):highlight]
+					-	-	[codeblock(doll):[em(q):quote]]
+						-	[em(q):quote]
+					-	-	[codeblock(doll):[em(i)(b)(u)(s)(h)(q):everything]]
+						-	[em(i)(b)(u)(s)(h)(q):everything]
+
+					-	[tc(head)(rows=2):[code:quote]]
+						[tc(rows=2):[code:QUOTE_TAG]]
+						[tc(rows=2)::
+							block quotes
+
+							an optional cite argument may be provided
+						]
+						-	[codeblock(doll)::
+								[quote::
+									block quotes can contain [em:markdoll]
+								]
+							]
+						-	[quote::
+								block quotes can contain [em:markdoll]
+							]
+					-	-	[codeblock(doll)::
+								[quote(citation goes here)::
+									block quotes can contain [em:markdoll]
+								]
+							]
+						-	[quote(citation goes here)::
+								block quotes can contain [em:markdoll]
+							]
+				]
+			&code
+				located in [code:markdoll::ext::code]
+
+				[table::
+					=	=	tag
+						=	import
+						=	description
+						=	syntax
+						=	result
+
+					-	=	[code:code]
+						-	[code:CODE_TAG]
+						-	inline code blocks
+						-	[codeblock:[code:whatever code goes here, it is not [parsed] whatsoever]]
+						-	[code:whatever code goes here, it is not [parsed] whatsoever]
+
+					-	[tc(head)(rows=2):[code:codeblock]]
+						[tc(rows=2):[code:CODEBLOCK_TAG]]
+						[tc(rows=2)::
+							code blocks with an optional language code
+
+							language codes index into the [code:doll.builtin_emitters.code_block] map,
+							modify it to add custom highlighting for certain languages
+						]
+						-	[codeblock(doll)::
+								[codeblock::
+									anything can go here :3
+								]
+							]
+						-	[codeblock::
+								anything can go here :3
+							]
+					-	-	[codeblock(doll)::
+								[codeblock(lang)::
+									anything can go here :3
+									it will attempt to use `doll.builtin_emitters.code_block["lang"]` to apply syntax highlighting
+								]
+							]
+						-	[codeblock(lang)::
+								anything can go here :3
+								it will attempt to use `doll.builtin_emitters.code_block["lang"]` to apply syntax highlighting
+							]
+				]
+			&links
+				located in [code:markdoll::ext::links]
+
+				[table::
+					=	=	tag
+						=	import
+						=	description
+						=	syntax
+						=	result
+
+					-	=	[code:link]
+						-	[code:LINK_TAG]
+						-	create links
+						-	[codeblock:[link(https://github.com/0x57e11a/markdoll):markdoll]]
+						-	[link(https://github.com/0x57e11a/markdoll):markdoll]
+
+					-	=	[code:def]
+						-	[code:DEF_TAG]
+						-	in-page anchors to be used with the [code:ref] tag
+
+							defines the `ref-<id>` HTML id, replacing `<id>` with the id argument
+						-	[codeblock:[def(def-tag):this is a definition for def-tag using the def tag, maybe a bit meta?]]
+						-	[def(def-tag):this is a definition for def-tag using the def tag, maybe a bit meta?]
+
+					-	=	[code:ref]
+						-	[code:REF_TAG]
+						-	link to an anchor defined by the [code:def] tag
+
+							links to the `ref-<id>` HTML id, replacing `<id>` with the id argument
+						-	[codeblock:this is a reference[ref(def-tag)]]
+						-	this is a reference[ref(def-tag)]
+				]
+			&table
+				located in [code:markdoll::ext::table]
+
+				[table::
+					=	=	tag
+						=	import
+						=	description
+						=	syntax
+						=	result
+
+					-	[tc(head)(rows=2):[code:table]]
+						[tc(rows=2):[code:TBL_TAG]]
+						[tc(rows=2)::
+							tables
+
+							tables have two syntaxes (that can be mix-matched, even within eachother):
+							-	list syntax\
+								unordered list elements define normal rows/cells, ordered lists define head rows/cells\
+								[em:cannot create cells that span multiple rows/columns, use tags for that]
+							-	tag syntax\
+								using [code:tr]/[code:tc] tags and their arguments/flags
+						]
+						-	[codeblock::
+								[table::
+									=	=	r1c1
+										=	r1c2
+										=	r1c3
+
+									-	=	r2c1
+										-	r2c2
+										-	r2c3
+
+									-	=	r3c1
+										-	r3c2
+										-	r3c3
+								]
+							]
+						-	[table::
+								=	=	r1c1
+									=	r1c2
+									=	r1c3
+
+								-	=	r2c1
+									-	r2c2
+									-	r2c3
+
+								-	=	r3c1
+									-	r3c2
+									-	r3c3
+							]
+					-	-	[codeblock::
+								[table::
+									[tr(head)::
+										[tc(head):r1c1]
+										[tc(head):r1c2]
+										[tc(head):r1c3]
+									]
+
+									[tr::
+										[tc(head):r2c1]
+										[tc:r2c2]
+										[tc:r2c3]
+									]
+
+									[tr::
+										[tc(head):r3c1]
+										[tc:r3c2]
+										[tc:r3c3]
+									]
+								]
+							]
+						-	[table::
+								[tr(head)::
+									[tc(head):r1c1]
+									[tc(head):r1c2]
+									[tc(head):r1c3]
+								]
+
+								[tr::
+									[tc(head):r2c1]
+									[tc:r2c2]
+									[tc:r2c3]
+								]
+
+								[tr::
+									[tc(head):r3c1]
+									[tc:r3c2]
+									[tc:r3c3]
+								]
+							]
+
+					-	[tc(head)(rows=2):[code:tr]]
+						[tc(rows=2):[code:TBLROW_TAG]]
+						[tc(rows=2)::
+							create table rows inside tables
+
+							pass the [code:head] flag to insert it into the head section
+						]
+						-	[codeblock::
+								[table::
+									[tr::
+										[tc:cells go here, whether by list or tag syntax]
+									]
+								]
+							]
+						-	[table::
+								[tr::
+									[tc:cells go here, whether by list or tag syntax]
+								]
+							]
+					-	-	[codeblock::
+								[table::
+									[tr(head)::
+										[tc(head):cells go here, they should be [code:head] cells, whether by list or tag syntax]
+									]
+								]
+							]
+						-	[table::
+								[tr(head)::
+									[tc(head):cells go here, they should be [code:head] cells, whether by list or tag syntax]
+								]
+							]
+
+					-	[tc(head)(rows=4):[code:tc]]
+						[tc(rows=4):[code:TBLCELL_TAG]]
+						[tc(rows=4)::
+							create table cells inside table rows
+
+							pass the [code:head] flag to make it a head cell
+
+							set the [code:rows]/[code:cols] props to make cells that span multiple rows/columns
+						]
+						-	[codeblock::
+								[table::
+									[tr::
+										[tc:content]
+									]
+								]
+							]
+						-	[table::
+								[tr::
+									[tc:content]
+								]
+							]
+					-	-	[codeblock::
+								[table::
+									[tr::
+										[tc(head):content]
+									]
+								]
+							]
+						-	[table::
+								[tr::
+									[tc(head):content]
+								]
+							]
+					-	-	[codeblock::
+								[table::
+									[tr::
+										[tc(rows=2):two rows]
+										[tc:upper]
+									]
+									[tr::
+										[tc:lower]
+									]
+								]
+							]
+						-	[table::
+								[tr::
+									[tc(rows=2):two rows]
+									[tc:upper]
+								]
+								[tr::
+									[tc:lower]
+								]
+							]
+					-	-	[codeblock::
+								[table::
+									[tr::
+										[tc(cols=2):two cols]
+									]
+									[tr::
+										[tc:left]
+										[tc:right]
+									]
+								]
+							]
+						-	[table::
+								[tr::
+									[tc(cols=2):two cols]
+								]
+								[tr::
+									[tc:left]
+									[tc:right]
+								]
+							]
+				]

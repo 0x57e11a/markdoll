@@ -1,3 +1,9 @@
+pub mod code;
+pub mod common;
+pub mod formatting;
+pub mod links;
+pub mod table;
+
 use {
 	crate::{emit::To, tree::TagContent, MarkDoll},
 	alloc::{boxed::Box, vec::Vec},
