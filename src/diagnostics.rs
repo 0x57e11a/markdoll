@@ -1,7 +1,8 @@
+#[cfg(feature = "ariadne")]
+use ariadne::{Label, Report, ReportKind};
 use {
-	alloc::{format, rc::Rc, vec::Vec},
-	ariadne::{Label, Report, ReportKind},
-	core::{cmp::Ordering, panic::Location},
+	alloc::{rc::Rc, vec::Vec},
+	core::cmp::Ordering,
 };
 
 /// an issue in the source
@@ -14,7 +15,8 @@ pub struct Diagnostic {
 	/// the content of this diagnostic
 	pub code: &'static str,
 	#[cfg(debug_assertions)]
-	pub(crate) src: &'static Location<'static>,
+	#[allow(unused, reason = "conditional")]
+	pub(crate) src: &'static core::panic::Location<'static>,
 }
 
 #[derive(Debug)]
@@ -124,6 +126,7 @@ pub fn render(diagnostics: &[Diagnostic]) -> Vec<Report<'static>> {
 	diagnostics
 		.iter()
 		.map(|diag| {
+			#[allow(unused_mut, reason = "conditional")]
 			let mut builder = Report::build(ReportKind::Error, (), diag.at)
 				.with_message(diag.code)
 				.with_label(
@@ -133,7 +136,7 @@ pub fn render(diagnostics: &[Diagnostic]) -> Vec<Report<'static>> {
 				);
 
 			#[cfg(debug_assertions)]
-			builder.set_note(format!("originated from {}", diag.src));
+			builder.set_note(alloc::format!("originated from {}", diag.src));
 
 			builder.finish()
 		})

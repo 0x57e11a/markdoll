@@ -14,11 +14,10 @@ categories = ["compilers", "no-std", "parser-implementation", "visualization"]
 hashbrown = "0.14.5"
 html-escape = "0.2.13"
 downcast-rs = "1.2.1"
-lender = "0.2.9"
-ariadne = { version = "0.4.1", optional = true }
 log = "0.4.22"
 env_logger = "0.11.5"
+ariadne = { version = "0.4.1", optional = true }
 
 [features]
-default = ["ariadne"]
+default = []
 ariadne = ["dep:ariadne"]

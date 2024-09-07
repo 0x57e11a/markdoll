@@ -33,7 +33,6 @@ use {
 		tree::{parser, AST},
 	},
 	alloc::{string::String, vec::Vec},
-	core::panic::Location,
 	hashbrown::HashMap,
 };
 
@@ -218,7 +217,7 @@ impl MarkDoll {
 			at,
 			code,
 			#[cfg(debug_assertions)]
-			src: Location::caller(),
+			src: core::panic::Location::caller(),
 		});
 	}
 }

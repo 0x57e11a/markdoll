@@ -161,26 +161,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7943c866cc5cd64cbc25b2e01621d07fa8eb2a1a23160ee81ce38704e97b8ecf"
 
 [[package]]
-name = "lender"
-version = "0.2.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39b1f7f753a5da003547d93e9e8f6542e81db06adad15dda47a9cd12559ab2e0"
-dependencies = [
- "lender-derive",
-]
-
-[[package]]
-name = "lender-derive"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "556faf0c9adb22669a5f9f6b4ed804c8048d205dcd00fadd463affbb02931d26"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "log"
 version = "0.4.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -195,7 +175,6 @@ dependencies = [
  "env_logger",
  "hashbrown",
  "html-escape",
- "lender",
  "log",
 ]
 
