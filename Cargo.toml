@@ -6,6 +6,7 @@ edition = "2021"
 description = "a structured and extensible markup language"
 readme = "README.md"
 repository = "https://github.com/0x57e11a/markdoll"
+rust-version = "1.81"
 license = "MIT"
 keywords = ["markup"]
 categories = ["compilers", "no-std", "parser-implementations", "visualization"]
