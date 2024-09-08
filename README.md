@@ -12,3 +12,7 @@ to get an idea of the syntax, [visit the repository](https://github.com/0x57e11a
 
 - `ariadne`
   allows fancy diagnostic printing, requires `std`
+
+## minimum supported rust version
+
+this library requires features from rust 1.81

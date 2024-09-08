@@ -6,6 +6,7 @@ edition = "2021"
 description = "a structured and extensible markup language"
 readme = "README.md"
 repository = "https://github.com/0x57e11a/markdoll"
+rust-version = "1.81"
 license = "MIT"
 keywords = ["markup"]
 categories = ["compilers", "no-std", "parser-implementations", "visualization"]
@@ -17,7 +18,13 @@ downcast-rs = "1.2.1"
 log = "0.4.22"
 env_logger = "0.11.5"
 ariadne = { version = "0.4.1", optional = true }
+clap = { version = "4.5.17", features = ["derive"], optional = true }
 
 [features]
 default = []
 ariadne = ["dep:ariadne"]
+cli = ["dep:clap", "ariadne"]
+
+[[bin]]
+name = "markdoll"
+required-features = ["cli"]
