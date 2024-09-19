@@ -28,3 +28,7 @@ cli = ["dep:clap", "ariadne"]
 [[bin]]
 name = "markdoll"
 required-features = ["cli"]
+
+[[test]]
+name = "parses_own_spec"
+required-features = ["ariadne"]

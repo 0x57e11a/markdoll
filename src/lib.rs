@@ -64,9 +64,6 @@ pub mod ext;
 /// syntax trees and parser
 pub mod tree;
 
-#[cfg(test)]
-mod tests;
-
 /// markdoll's main context
 #[derive(Debug)]
 pub struct MarkDoll {
@@ -172,41 +169,21 @@ impl MarkDoll {
 
 			at = if at == usize::MAX {
 				trans.tag_pos_in_parent
+			} else if let Some(indexed) = &trans.indexed {
+				t!(
+					"indexed parent offset (prev indexed)",
+					indexed.parent_offset(at)
+				)
 			} else {
-				/*
-				let line = 'line: {
-					let mut start = 0;
-
-					for (i, line) in trans.src.lines().enumerate() {
-						start += line.len() + 1;
-
-						if start >= at {
-							break 'line i;
-						}
-					}
-
-					0
-				};
-
-				trans.offset_in_parent + line * trans.indent + at
-				*/
-
-				if let Some(indexed) = &trans.indexed {
-					t!(
-						"indexed parent offset (prev indexed)",
-						indexed.parent_offset(at)
-					)
-				} else {
-					let indexed = IndexedSrc::index(
-						&trans.src,
-						&parent.src,
-						trans.offset_in_parent,
-						trans.indent,
-					);
-					let index = t!("indexed parent offset", indexed.parent_offset(at));
-					trans.indexed = Some(indexed);
-					index
-				}
+				let indexed = IndexedSrc::index(
+					&trans.src,
+					&parent.src,
+					trans.offset_in_parent,
+					trans.indent,
+				);
+				let index = t!("indexed parent offset", indexed.parent_offset(at));
+				trans.indexed = Some(indexed);
+				index
 			};
 
 			i -= 1;

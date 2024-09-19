@@ -17,6 +17,8 @@
 			-	unless the last character of the line is a backslash ([code:\\]), splitting text by a newline instead inserts a space
 			-	separating text/tags by an empty line splits it into two paragraphs
 			-	separating list elements by an empty line splits it into two lists
+
+			[em(h):do note that all .doll files must be LF, CR characters will cause a fatal parsing error]
 		&tags
 			markdoll has a concept of "tags", which have a keyword and may choose to have arguments and content
 

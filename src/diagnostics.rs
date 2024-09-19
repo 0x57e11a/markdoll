@@ -14,9 +14,12 @@ pub struct Diagnostic {
 	pub at: usize,
 	/// the content of this diagnostic
 	pub code: &'static str,
+	/// the location in the source of this diagnostic
+	///
+	/// this only exists in debug mode, so use [`doll.diag`](crate::MarkDoll::diag) or annotate things with `#[cfg(debug_assertions)]`
 	#[cfg(debug_assertions)]
 	#[allow(unused, reason = "conditional")]
-	pub(crate) src: &'static core::panic::Location<'static>,
+	pub src: &'static core::panic::Location<'static>,
 }
 
 #[derive(Debug)]

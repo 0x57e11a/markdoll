@@ -113,7 +113,6 @@ pub(crate) struct Ctx<'doll> {
 	stream: Stream,
 	stack: Vec<StackPart>,
 	inline: Vec<(usize, InlineItem)>,
-	warned_cr: bool,
 }
 
 impl<'doll> Ctx<'doll> {
@@ -132,7 +131,6 @@ impl<'doll> Ctx<'doll> {
 				stack
 			},
 			inline: Vec::new(),
-			warned_cr: false,
 		}
 	}
 
@@ -269,10 +267,13 @@ impl<'doll> Ctx<'doll> {
 
 	/// `:neocat_floof_explode:`
 	#[track_caller]
-	pub fn warn_cr(&mut self) {
-		if !self.warned_cr {
-			self.doll.diag(false, 0, "markdoll does not support CRLF");
-		}
+	pub fn crlf_explode(&mut self) {
+		self.doll.diag(
+			false,
+			self.stream.index,
+			"markdoll does not support CRLF, fatal parsing error",
+		);
+		self.stream.index = self.stream.src.len();
 	}
 
 	#[must_use]
@@ -539,7 +540,7 @@ mod indent {
 
 				Some(ch) => {
 					if ch == '\r' {
-						ctx.warn_cr();
+						ctx.crlf_explode();
 					}
 
 					if !exit(ctx, &mut indent_level) {
@@ -590,7 +591,7 @@ mod tag {
 
 					Some(ch) => {
 						if ch == '\r' {
-							ctx.warn_cr();
+							ctx.crlf_explode();
 						}
 						text.push(ch);
 					}
@@ -616,7 +617,7 @@ mod tag {
 
 				Some(ch) => {
 					if ch == '\r' {
-						ctx.warn_cr();
+						ctx.crlf_explode();
 					}
 					text.push(ch);
 				}
@@ -682,7 +683,7 @@ mod tag {
 
 					Some(ch) => {
 						if ch == '\r' {
-							ctx.warn_cr();
+							ctx.crlf_explode();
 						}
 						arg.push(ch);
 					}
@@ -695,7 +696,7 @@ mod tag {
 
 				Some(ch) => {
 					if ch == '\r' {
-						ctx.warn_cr();
+						ctx.crlf_explode();
 					}
 					arg.push(ch);
 				}
@@ -744,7 +745,7 @@ mod tag {
 					// not a newline
 					Some(ch) => {
 						if ch == '\r' {
-							ctx.warn_cr();
+							ctx.crlf_explode();
 						}
 
 						ctx.err("expected newline");
@@ -767,7 +768,7 @@ mod tag {
 
 			Some(ch) => {
 				if ch == '\r' {
-					ctx.warn_cr();
+					ctx.crlf_explode();
 				}
 
 				let offset_in_parent = ctx.stream.index;
@@ -870,7 +871,7 @@ mod tag {
 
 				Some(ch) => {
 					if ch == '\r' {
-						ctx.warn_cr();
+						ctx.crlf_explode();
 					}
 					tag.push(ch);
 				}
@@ -933,7 +934,7 @@ pub(crate) fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 
 							Some(ch) => {
 								if ch == '\r' {
-									ctx.warn_cr();
+									ctx.crlf_explode();
 								}
 								name.push(ch);
 							}
@@ -969,7 +970,7 @@ pub(crate) fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 						// start parsing text
 						Some(ch) => {
 							if ch == '\r' {
-								ctx.warn_cr();
+								ctx.crlf_explode();
 							}
 
 							ctx.stream.back();
@@ -1004,7 +1005,7 @@ pub(crate) fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 
 										Some(ch) => {
 											if ch == '\r' {
-												ctx.warn_cr();
+												ctx.crlf_explode();
 											}
 
 											text.push(ch);
@@ -1026,7 +1027,7 @@ pub(crate) fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 
 									Some(ch) => {
 										if ch == '\r' {
-											ctx.warn_cr();
+											ctx.crlf_explode();
 										}
 										text.push(ch);
 									}
@@ -1067,7 +1068,7 @@ pub(crate) fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 				}
 
 				if warn_cr {
-					ctx.warn_cr();
+					ctx.crlf_explode();
 				}
 			}
 		}

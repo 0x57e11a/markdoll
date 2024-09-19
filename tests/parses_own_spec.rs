@@ -1,14 +1,10 @@
 use {
-	crate::{diagnostics::render, ext, MarkDoll},
-	alloc::{boxed::Box, string::String},
 	ariadne::Source,
+	markdoll::{diagnostics::render, ext, MarkDoll},
 };
 
-extern crate std;
-use std::println;
-
 #[test]
-pub fn test_syntax() {
+pub fn parses_own_spec() {
 	env_logger::builder()
 		.target(env_logger::Target::Pipe(Box::new(
 			std::fs::File::create("target/trace.txt").unwrap(),
@@ -17,7 +13,7 @@ pub fn test_syntax() {
 		.default_format()
 		.init();
 
-	const SRC: &'static str = include_str!("../../spec.doll");
+	const SRC: &'static str = include_str!("../spec.doll");
 
 	let mut out = String::new();
 
