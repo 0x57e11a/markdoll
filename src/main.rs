@@ -1,9 +1,10 @@
 #![cfg(feature = "cli")]
 
-use std::io::Read;
-
-use clap::{Parser, Subcommand};
-use markdoll::MarkDoll;
+use {
+	clap::{Parser, Subcommand},
+	markdoll::MarkDoll,
+	std::io::Read,
+};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]

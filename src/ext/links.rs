@@ -36,12 +36,16 @@ pub const LINK_TAG: TagDefinition = TagDefinition {
 			props();
 		};
 
-		if let Ok(ast) = doll.parse(text) {
-			Some(Box::new(Link { href, ast }))
-		} else {
-			doll.ok = false;
-			None
-		}
+		Some(Box::new(Link {
+			href,
+			ast: match doll.parse(text) {
+				Ok(ast) => ast,
+				Err(ast) => {
+					doll.ok = false;
+					ast
+				}
+			},
+		}))
 	}),
 	emit: |doll, to, content| {
 		let link = content.downcast_mut::<Link>().unwrap();
@@ -133,12 +137,16 @@ pub const DEF_TAG: TagDefinition = TagDefinition {
 			props();
 		};
 
-		if let Ok(ast) = doll.parse(text) {
-			Some(Box::new(Link { href, ast }))
-		} else {
-			doll.ok = false;
-			None
-		}
+		Some(Box::new(Link {
+			href,
+			ast: match doll.parse(text) {
+				Ok(ast) => ast,
+				Err(ast) => {
+					doll.ok = false;
+					ast
+				}
+			},
+		}))
 	}),
 	emit: |doll, to, content| {
 		let link = content.downcast_mut::<Link>().unwrap();
@@ -179,13 +187,11 @@ pub const REF_TAG: TagDefinition = TagDefinition {
 			props();
 		};
 
-		if text.is_empty() {
-			Some(Box::new(href))
-		} else {
+		if !text.is_empty() {
 			doll.diag(true, usize::MAX, "cannot have content");
-
-			None
 		}
+
+		Some(Box::new(href))
 	}),
 	emit: |_, to, content| {
 		let href = content.downcast_ref::<String>().unwrap();

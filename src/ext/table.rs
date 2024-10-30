@@ -91,55 +91,58 @@ pub const TBL_TAG: TagDefinition = TagDefinition {
 			);
 		}
 
-		if let Ok(ast) = doll.parse(text) {
-			let mut table = Table {
-				head: Vec::new(),
-				body: Vec::new(),
-			};
-
-			for child in ast {
-				match child {
-					BlockItem::Inline(items) => {
-						for (pos, item) in items {
-							match item {
-								InlineItem::Tag(TagInvocation { content, .. }) => {
-									if let Ok(row) = content.downcast::<Row>() {
-										if row.is_head {
-											table.head.push(*row);
-										} else {
-											table.body.push(*row);
-										}
-									} else {
-										fail(doll, pos);
-									}
-								}
-								_ => fail(doll, pos),
-							}
-						}
-					}
-					BlockItem::List { ordered, items, .. } => {
-						for item in items {
-							let row = Row {
-								is_head: ordered,
-								cells: parse_row(doll, item),
-							};
-
-							if row.is_head {
-								table.head.push(row);
-							} else {
-								table.body.push(row);
-							}
-						}
-					}
-					BlockItem::Section { pos, .. } => fail(doll, pos),
-				}
+		let ast = match doll.parse(text) {
+			Ok(ast) => ast,
+			Err(ast) => {
+				doll.ok = false;
+				ast
 			}
+		};
 
-			Some(Box::new(table))
-		} else {
-			doll.ok = false;
-			None
+		let mut table = Table {
+			head: Vec::new(),
+			body: Vec::new(),
+		};
+
+		for child in ast {
+			match child {
+				BlockItem::Inline(items) => {
+					for (pos, item) in items {
+						match item {
+							InlineItem::Tag(TagInvocation { content, .. }) => {
+								if let Ok(row) = content.downcast::<Row>() {
+									if row.is_head {
+										table.head.push(*row);
+									} else {
+										table.body.push(*row);
+									}
+								} else {
+									fail(doll, pos);
+								}
+							}
+							_ => fail(doll, pos),
+						}
+					}
+				}
+				BlockItem::List { ordered, items, .. } => {
+					for item in items {
+						let row = Row {
+							is_head: ordered,
+							cells: parse_row(doll, item),
+						};
+
+						if row.is_head {
+							table.head.push(row);
+						} else {
+							table.body.push(row);
+						}
+					}
+				}
+				BlockItem::Section { pos, .. } => fail(doll, pos),
+			}
 		}
+
+		Some(Box::new(table))
 	}),
 	emit: |doll, to, content| {
 		fn write_cell(doll: &mut MarkDoll, to: &mut dyn core::fmt::Write, cell: &mut Cell) {
@@ -221,24 +224,28 @@ pub const TBL_TAG: TagDefinition = TagDefinition {
 pub const TBLROW_TAG: TagDefinition = TagDefinition {
 	key: "tr",
 	parse: Some(|doll, mut args, text| {
-		if let Ok(ast) = doll.parse(text) {
-			args! {
-				doll, args;
+		args! {
+			doll, args;
 
-				args();
-				opt_args();
-				flags(head);
-				props();
-			}
-
-			Some(Box::new(Row {
-				is_head: head,
-				cells: parse_row(doll, ast),
-			}))
-		} else {
-			doll.ok = false;
-			None
+			args();
+			opt_args();
+			flags(head);
+			props();
 		}
+
+		Some(Box::new(Row {
+			is_head: head,
+			cells: {
+				let ast = match doll.parse(text) {
+					Ok(ast) => ast,
+					Err(ast) => {
+						doll.ok = false;
+						ast
+					}
+				};
+				parse_row(doll, ast)
+			},
+		}))
 	}),
 	emit: |doll, _, _| {
 		doll.diag(true, usize::MAX, "tblrow outside of tbl");
@@ -267,26 +274,27 @@ pub const TBLROW_TAG: TagDefinition = TagDefinition {
 pub const TBLCELL_TAG: TagDefinition = TagDefinition {
 	key: "tc",
 	parse: Some(|doll, mut args, text| {
-		if let Ok(ast) = doll.parse(text) {
-			args! {
-				doll, args;
+		args! {
+			doll, args;
 
-				args();
-				opt_args();
-				flags(head);
-				props(rows: usize, cols: usize);
-			}
-
-			Some(Box::new(Cell {
-				is_head: head,
-				rows: rows.unwrap_or(1),
-				cols: cols.unwrap_or(1),
-				content: ast,
-			}))
-		} else {
-			doll.ok = false;
-			None
+			args();
+			opt_args();
+			flags(head);
+			props(rows: usize, cols: usize);
 		}
+
+		Some(Box::new(Cell {
+			is_head: head,
+			rows: rows.unwrap_or(1),
+			cols: cols.unwrap_or(1),
+			content: match doll.parse(text) {
+				Ok(ast) => ast,
+				Err(ast) => {
+					doll.ok = false;
+					ast
+				}
+			},
+		}))
 	}),
 	emit: |doll, _, _| {
 		doll.diag(true, usize::MAX, "table(cell) outside of table");

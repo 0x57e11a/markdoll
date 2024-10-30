@@ -52,20 +52,21 @@ pub const EMPHASIS_TAG: TagDefinition = TagDefinition {
 			props();
 		};
 
-		if let Ok(ast) = doll.parse(text) {
-			Some(Box::new(Emphasis {
-				italic: i || (!b && !u && !s && !h && !q),
-				bold: b,
-				underline: u,
-				strikethrough: s,
-				highlight: h,
-				quote: q,
-				ast,
-			}))
-		} else {
-			doll.ok = false;
-			None
-		}
+		Some(Box::new(Emphasis {
+			italic: i || (!b && !u && !s && !h && !q),
+			bold: b,
+			underline: u,
+			strikethrough: s,
+			highlight: h,
+			quote: q,
+			ast: match doll.parse(text) {
+				Ok(ast) => ast,
+				Err(ast) => {
+					doll.ok = false;
+					ast
+				}
+			},
+		}))
 	}),
 	emit: |doll, to, content| {
 		let em = content.downcast_mut::<Emphasis>().unwrap();
@@ -155,12 +156,16 @@ pub const QUOTE_TAG: TagDefinition = TagDefinition {
 			props();
 		}
 
-		if let Ok(ast) = doll.parse(text) {
-			Some(Box::new(Quote { cite, ast }))
-		} else {
-			doll.ok = false;
-			None
-		}
+		Some(Box::new(Quote {
+			cite,
+			ast: match doll.parse(text) {
+				Ok(ast) => ast,
+				Err(ast) => {
+					doll.ok = false;
+					ast
+				}
+			},
+		}))
 	}),
 	emit: |doll, to, content| {
 		let quote = content.downcast_mut::<Quote>().unwrap();
