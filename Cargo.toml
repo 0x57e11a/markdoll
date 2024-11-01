@@ -1,6 +1,6 @@
 [package]
 name = "markdoll"
-version = "0.1.1"
+version = "2.0.0"
 authors = ["0x57e11a"]
 edition = "2021"
 description = "a structured and extensible markup language"

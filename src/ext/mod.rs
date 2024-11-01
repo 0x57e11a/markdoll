@@ -10,13 +10,19 @@ pub mod links;
 pub mod table;
 
 use {
-	crate::{emit::To, tree::TagContent, MarkDoll},
+	crate::{tree::TagContent, typemap::TypeMap, MarkDoll},
 	alloc::{boxed::Box, vec::Vec},
 	hashbrown::HashMap,
 };
 
+/// the parsing signature tags use
+pub type TagParser =
+	fn(doll: &mut MarkDoll, args: Vec<&str>, text: &str) -> Option<Box<dyn TagContent>>;
+/// the emitting signature tags use for a given `To`
+pub type TagEmitter<To> = fn(doll: &mut MarkDoll, to: &mut To, content: &mut Box<dyn TagContent>);
+
 /// defines a tag name, how to parse its contents, and how to emit it
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 #[allow(
 	clippy::type_complexity,
 	reason = "type is never mentioned outside of this struct, simple functions"
@@ -28,11 +34,44 @@ pub struct TagDefinition {
 	/// parse the tag contents
 	///
 	/// return None to avoid being placed into the AST and emitting
-	pub parse:
-		Option<fn(doll: &mut MarkDoll, args: Vec<&str>, text: &str) -> Option<Box<dyn TagContent>>>,
+	pub parse: Option<TagParser>,
 
 	/// emit the tag content
-	pub emit: fn(doll: &mut MarkDoll, to: To, content: &mut Box<dyn TagContent>),
+	emitters: TypeMap,
+}
+
+impl TagDefinition {
+	fn new(key: &'static str, parse: Option<TagParser>) -> TagDefinition {
+		Self {
+			key,
+			parse,
+			emitters: TypeMap::default(),
+		}
+	}
+
+	/// set the emitter on this tag for an emit target
+	pub fn set_emitter<To: 'static>(&mut self, emitter: TagEmitter<To>) {
+		self.emitters.put(emitter);
+	}
+
+	/// set the emitter on this tag for an emit target, and return self for chaining
+	#[must_use]
+	pub fn with_emitter<To: 'static>(mut self, emitter: TagEmitter<To>) -> Self {
+		self.set_emitter(emitter);
+		self
+	}
+
+	/// retrieve the emitter on this tag for an emit target
+	#[must_use]
+	pub fn emitter_for<To: 'static>(&self) -> Option<TagEmitter<To>> {
+		self.emitters.get_ref().copied()
+	}
+
+	/// whether this tag has any emitters
+	#[must_use]
+	pub fn has_any_emitters(&self) -> bool {
+		!self.emitters.is_empty()
+	}
 }
 
 /// helper macro to parse arguments into variables
@@ -193,9 +232,9 @@ impl ExtensionSystem {
 	}
 
 	/// add multiple tags
-	pub fn add_tags(&mut self, tags: &[TagDefinition]) {
+	pub fn add_tags<const N: usize>(&mut self, tags: [TagDefinition; N]) {
 		for tag in tags {
-			self.add_tag(*tag);
+			self.add_tag(tag);
 		}
 	}
 }

@@ -130,13 +130,21 @@ pub fn render(diagnostics: &[Diagnostic]) -> Vec<Report<'static>> {
 		.iter()
 		.map(|diag| {
 			#[allow(unused_mut, reason = "conditional")]
-			let mut builder = Report::build(ReportKind::Error, (), diag.at)
-				.with_message(diag.code)
-				.with_label(
-					Label::new(diag.at..diag.at + 1)
-						.with_color(ariadne::Color::Magenta)
-						.with_message(diag.code),
-				);
+			let mut builder = Report::build(
+				if diag.err {
+					ReportKind::Error
+				} else {
+					ReportKind::Warning
+				},
+				(),
+				diag.at,
+			)
+			.with_message(diag.code)
+			.with_label(
+				Label::new(diag.at..diag.at + 1)
+					.with_color(ariadne::Color::Magenta)
+					.with_message(diag.code),
+			);
 
 			#[cfg(debug_assertions)]
 			builder.set_note(alloc::format!("originated from {}", diag.src));

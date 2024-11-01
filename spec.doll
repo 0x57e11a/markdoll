@@ -1,3 +1,7 @@
+---
+awawa!
+---
+
 &markdoll
 	this is markdoll
 
@@ -261,8 +265,9 @@
 						[tc(rows=2)::
 							code blocks with an optional language code
 
-							language codes index into the [code:doll.builtin_emitters.code_block] map,
-							modify it to add custom highlighting for certain languages
+							each emit target that implements this tag chooses how to handle the language code
+
+							the default HTML target uses the `html_emit.code_block_format` map to find a function to render each language
 						]
 						-	[codeblock(doll)::
 								[codeblock::
@@ -273,14 +278,12 @@
 								anything can go here :3
 							]
 					-	-	[codeblock(doll)::
-								[codeblock(lang)::
+								[codeblock(doll)::
 									anything can go here :3
-									it will attempt to use `doll.builtin_emitters.code_block["lang"]` to apply syntax highlighting
 								]
 							]
-						-	[codeblock(lang)::
+						-	[codeblock(doll)::
 								anything can go here :3
-								it will attempt to use `doll.builtin_emitters.code_block["lang"]` to apply syntax highlighting
 							]
 				]
 			&links

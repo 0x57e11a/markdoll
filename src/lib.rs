@@ -1,8 +1,6 @@
-#![doc = "
-	a
-"]
+#![doc = include_str!("../README.md")]
 #![no_std]
-#![forbid(unsafe_code)]
+#![feature(downcast_unchecked)]
 #![warn(
 	clippy::pedantic,
 	clippy::allow_attributes_without_reason,
@@ -22,17 +20,23 @@
 	reason = "more confusing to merge in many cases"
 )]
 #![allow(clippy::wildcard_imports, reason = "used in parsing modules")]
+#![allow(
+	clippy::module_inception,
+	reason = "tag names may share their module name, but it doesn't make sense to merge them"
+)]
 
 extern crate alloc;
 
 use {
 	crate::{
 		diagnostics::{Diagnostic, IndexedSrc, TagDiagnosticTranslation},
-		emit::{BuiltInEmitters, To},
+		emit::BuiltInEmitters,
 		ext::ExtensionSystem,
 		tree::{parser, AST},
+		typemap::TypeMap,
 	},
-	alloc::{string::String, vec::Vec},
+	::alloc::string::String,
+	alloc::vec::Vec,
 	hashbrown::HashMap,
 };
 
@@ -63,16 +67,16 @@ pub mod emit;
 pub mod ext;
 /// syntax trees and parser
 pub mod tree;
+/// storage by [`TypeId`](core::any::TypeId)
+pub mod typemap;
 
 /// markdoll's main context
 #[derive(Debug)]
 pub struct MarkDoll {
 	/// the extension system, used to add tags
 	pub ext_system: ExtensionSystem,
-	/// the emitters for built in items and for formatting code blocks
-	pub builtin_emitters: BuiltInEmitters,
-	/// defines the syntax highlighting for the [`codeblock`](crate::ext::code::CODEBLOCK_TAG) tag
-	pub code_block: HashMap<String, fn(doll: &mut MarkDoll, to: To, text: &str)>,
+
+	pub(crate) builtin_emitters: TypeMap,
 
 	pub(crate) ok: bool,
 	pub(crate) diagnostics: Vec<Diagnostic>,
@@ -87,13 +91,18 @@ impl MarkDoll {
 			ext_system: ExtensionSystem {
 				tags: HashMap::new(),
 			},
-			builtin_emitters: BuiltInEmitters::default(),
-			code_block: HashMap::new(),
+
+			builtin_emitters: TypeMap::default(),
 
 			ok: true,
 			diagnostics: Vec::new(),
 			diagnostic_translations: Vec::new(),
 		}
+	}
+
+	/// set [`BuiltInEmitters`] for an emit target [`To`]
+	pub fn set_emitters<To: 'static>(&mut self, emitters: BuiltInEmitters<To>) {
+		self.builtin_emitters.put(emitters);
 	}
 
 	/// parse the input into an AST
@@ -118,10 +127,44 @@ impl MarkDoll {
 		let ok = self.ok;
 
 		self.ok = true;
-		let ast = parser::parse(parser::Ctx::new(self, input));
+		let res = parser::parse(parser::Ctx::new(self, input, false));
 		self.ok = ok;
 
-		ast
+		match res {
+			Ok((_, ast)) => Ok(ast),
+			Err((_, ast)) => Err(ast),
+		}
+	}
+
+	/// parse a complete document into an AST, including frontmatter
+	///
+	/// # errors
+	///
+	/// if any error diagnostics are emitted, the resulting [`AST`] may be incomplete
+	///
+	/// # note
+	///
+	/// ensure that the `finish` method is called to reset the state *before* parsing a new file
+	pub fn parse_document(
+		&mut self,
+		input: &str,
+	) -> Result<(Option<String>, AST), (Option<String>, AST)> {
+		if self.diagnostic_translations.is_empty() {
+			self.diagnostic_translations.push(TagDiagnosticTranslation {
+				src: input.into(),
+				indexed: None,
+				offset_in_parent: 0,
+				tag_pos_in_parent: 0,
+				indent: 0,
+			});
+		}
+		let ok = self.ok;
+
+		self.ok = true;
+		let res = parser::parse(parser::Ctx::new(self, input, true));
+		self.ok = ok;
+
+		res
 	}
 
 	/// emit the given [`AST`] to an output, returning true if it was successful
@@ -129,12 +172,12 @@ impl MarkDoll {
 	/// # note
 	///
 	/// ensure that the `finish` method is called to reset the state *before* parsing a new file
-	pub fn emit(&mut self, ast: &mut AST, to: To) -> bool {
+	pub fn emit<To: 'static>(&mut self, ast: &mut AST, to: &mut To) -> bool {
 		let ok = self.ok;
 
 		self.ok = true;
 		for node in ast {
-			node.emit(self, to, true);
+			node.emit::<To>(self, to);
 		}
 		self.ok = ok;
 

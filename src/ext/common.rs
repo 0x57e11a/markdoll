@@ -7,11 +7,18 @@ use crate::ext::TagDefinition;
 /// # content
 ///
 /// anything
-pub const COMMENT_TAG: TagDefinition = TagDefinition {
-	key: "//",
-	parse: Some(|_, _, _| None),
-	emit: |_, _, _| {},
-};
+pub mod comment {
+	use super::*;
+
+	/// the tag
+	#[must_use]
+	pub fn tag() -> TagDefinition {
+		TagDefinition::new("//", Some(|_, _, _| None))
+	}
+}
 
 /// all of this module's tags
-pub const TAGS: &[TagDefinition] = &[COMMENT_TAG];
+#[must_use]
+pub fn tags() -> [TagDefinition; 1] {
+	[comment::tag()]
+}

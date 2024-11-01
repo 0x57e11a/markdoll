@@ -1,7 +1,7 @@
 pub(crate) mod parser;
 
 use {
-	crate::{emit::To, MarkDoll, TagDiagnosticTranslation},
+	crate::{emit::BuiltInEmitters, MarkDoll, TagDiagnosticTranslation},
 	alloc::{boxed::Box, string::String, vec::Vec},
 	downcast_rs::{impl_downcast, Downcast},
 };
@@ -30,15 +30,29 @@ pub struct TagInvocation {
 
 impl TagInvocation {
 	/// emit into an output
-	pub fn emit(&mut self, doll: &mut MarkDoll, to: To) {
+	pub fn emit<To: 'static>(&mut self, doll: &mut MarkDoll, to: &mut To) {
 		doll.diagnostic_translations
 			.push(self.diagnostic_translation.take().unwrap());
-		(doll
+
+		let def = doll
 			.ext_system
 			.tags
 			.get(&*self.tag)
-			.expect("tag not defined, this should've been handled by the parser")
-			.emit)(doll, to, &mut self.content);
+			.expect("tag not defined, this should've been handled by the parser");
+
+		match def.emitter_for::<To>() {
+			Some(emit) => emit(doll, to, &mut self.content),
+			None => doll.diag(
+				true,
+				usize::MAX,
+				if def.has_any_emitters() {
+					"this tag does not support emitting for this emit target"
+				} else {
+					"this tag cannot be emitted"
+				},
+			),
+		}
+
 		self.diagnostic_translation = Some(doll.diagnostic_translations.pop().unwrap());
 	}
 }
@@ -69,8 +83,6 @@ pub enum BlockItem {
 	Section {
 		/// position of the & defining the section
 		pos: usize,
-		/// heading level, starts at 1
-		level: usize,
 		/// heading text
 		name: String,
 		/// content of the section
@@ -90,19 +102,21 @@ pub enum BlockItem {
 
 impl BlockItem {
 	/// emit into an output
-	pub fn emit(&mut self, doll: &mut MarkDoll, to: To, inline_block: bool) {
+	pub fn emit<To: 'static>(&mut self, doll: &mut MarkDoll, to: &mut To) {
+		let builtin_emitters = doll
+			.builtin_emitters
+			.get_ref::<BuiltInEmitters<To>>()
+			.expect("no BuiltInEmitters defined for this emit target");
+
 		match self {
 			Self::Inline(segments) => {
-				(doll.builtin_emitters.inline)(doll, to, segments, inline_block);
+				(builtin_emitters.inline)(doll, to, segments);
 			}
-			Self::Section {
-				level,
-				name,
-				children,
-				..
-			} => (doll.builtin_emitters.section)(doll, to, *level, name, children),
+			Self::Section { name, children, .. } => {
+				(builtin_emitters.section)(doll, to, name, children);
+			}
 			Self::List { ordered, items, .. } => {
-				(doll.builtin_emitters.list)(doll, to, *ordered, &mut items[..]);
+				(builtin_emitters.list)(doll, to, *ordered, &mut items[..]);
 			}
 		}
 	}

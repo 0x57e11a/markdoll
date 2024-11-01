@@ -35,7 +35,6 @@ enum StackPart {
 	},
 	Section {
 		pos: usize,
-		level: usize,
 		name: String,
 		children: AST,
 	},
@@ -102,8 +101,45 @@ impl Stream {
 		}
 	}
 
+	pub fn eat_all(&mut self, desired: char) -> usize {
+		let mut n = 0;
+
+		loop {
+			match self.lookahead(1) {
+				Some(ch) if ch == desired => {
+					self.skip();
+					n += 1;
+				}
+				_ => break n,
+			}
+		}
+	}
+
 	pub fn lookahead(&mut self, n: usize) -> Option<char> {
 		self.src.get(self.index + n - 1).copied()
+	}
+
+	pub fn tr(&mut self) -> StreamTransaction {
+		StreamTransaction(self.index)
+	}
+
+	#[allow(clippy::unused_self, reason = "consistency")]
+	pub fn tr_commit(&mut self, trans: StreamTransaction) {
+		core::mem::forget(trans);
+	}
+
+	pub fn tr_cancel(&mut self, trans: StreamTransaction) {
+		self.index = trans.0;
+		core::mem::forget(trans);
+	}
+}
+
+/// makes a lot of noise if dropped without being explicitly handled
+struct StreamTransaction(usize);
+
+impl Drop for StreamTransaction {
+	fn drop(&mut self) {
+		panic!("stream transaction dropped")
 	}
 }
 
@@ -113,10 +149,11 @@ pub(crate) struct Ctx<'doll> {
 	stream: Stream,
 	stack: Vec<StackPart>,
 	inline: Vec<(usize, InlineItem)>,
+	document: bool,
 }
 
 impl<'doll> Ctx<'doll> {
-	pub fn new(doll: &'doll mut MarkDoll, src: &str) -> Self {
+	pub fn new(doll: &'doll mut MarkDoll, src: &str, document: bool) -> Self {
 		Self {
 			doll,
 			stream: Stream {
@@ -131,6 +168,7 @@ impl<'doll> Ctx<'doll> {
 				stack
 			},
 			inline: Vec::new(),
+			document,
 		}
 	}
 
@@ -158,13 +196,11 @@ impl<'doll> Ctx<'doll> {
 			}
 			StackPart::Section {
 				pos,
-				level,
 				name,
 				children,
 			} => {
 				self.stack_push_block_to_top(BlockItem::Section {
 					pos,
-					level,
 					name,
 					children,
 				});
@@ -276,43 +312,15 @@ impl<'doll> Ctx<'doll> {
 		self.stream.index = self.stream.src.len();
 	}
 
-	#[must_use]
-	pub fn find_parent_indent(&self) -> usize {
-		let mut indent = 1;
-
-		for TagDiagnosticTranslation { indent: parent, .. } in
-			self.doll.diagnostic_translations.iter().rev()
-		{
-			indent += parent;
-			indent = indent.saturating_sub(1);
-		}
-
-		indent
-	}
-
 	pub fn eat_until_newline(&mut self) -> bool {
 		loop {
 			match self.stream.next() {
 				Some('\n') => return true,
 				None => {
-					self.err("unexpected EOI");
+					self.err("unexpected EOI, expected newline");
 					return false;
 				}
 				_ => {}
-			}
-		}
-	}
-
-	pub fn eat_all(&mut self, desired: char) -> usize {
-		let mut n = 0;
-
-		loop {
-			match self.stream.lookahead(1) {
-				Some(ch) if ch == desired => {
-					self.stream.skip();
-					n += 1;
-				}
-				_ => break n,
 			}
 		}
 	}
@@ -324,12 +332,48 @@ enum ParseResult<T = ()> {
 	Stop,
 }
 
+fn frontmatter(ctx: &mut Ctx) -> Option<String> {
+	let tr = ctx.stream.tr();
+
+	if ctx.stream.eat_all('-') != 3 {
+		ctx.stream.tr_cancel(tr);
+
+		return None;
+	}
+
+	if !ctx.stream.try_eat('\n') {
+		ctx.err("expected newline to begin frontmatter");
+	}
+
+	ctx.stream.tr_commit(tr);
+
+	let mut frontmatter = String::new();
+
+	loop {
+		match ctx.stream.next() {
+			Some('\n') => {
+				if ctx.stream.eat_all('-') == 3 {
+					return Some(frontmatter);
+				}
+
+				frontmatter.push('\n');
+			}
+			Some(ch) => frontmatter.push(ch),
+			None => {
+				ctx.stream.skip();
+				ctx.err("unexpected EOI in frontmatter");
+				return None;
+			}
+		}
+	}
+}
+
 mod indent {
 	use super::*;
 
 	/// called before returning to normal parsing
 	fn exit(ctx: &mut Ctx, indent_level: &mut usize) -> bool {
-		if let n @ 1.. = ctx.eat_all(' ') {
+		if let n @ 1.. = ctx.stream.eat_all(' ') {
 			ctx.doll
 				.diag(false, ctx.stream.index - n, "erroneous leading spaces");
 		}
@@ -382,7 +426,7 @@ mod indent {
 	}
 
 	/// more indentation than current
-	fn more(ctx: &mut Ctx, kind: IndentKind, indent_level: usize) {
+	fn more(ctx: &mut Ctx, kind: IndentKind) {
 		ctx.flush_inline();
 
 		// more indent than the stack
@@ -391,7 +435,6 @@ mod indent {
 			ctx.err("unexpected indentation");
 			ctx.stack.push(StackPart::Section {
 				pos: ctx.stream.index - 1,
-				level: indent_level + ctx.find_parent_indent(),
 				name: "<invalid indentation>".to_string(),
 				children: Vec::new(),
 			});
@@ -530,7 +573,7 @@ mod indent {
 					} else if indent_level + 1 > ctx.stack.len() {
 						t!("[[[higher indent]]]");
 
-						more(ctx, kind, indent_level);
+						more(ctx, kind);
 					} else {
 						t!("[[[lower indent]]]");
 
@@ -893,8 +936,14 @@ mod tag {
 ///
 /// if any error diagnostics are emitted
 #[allow(clippy::too_many_lines, reason = "its not that big")]
-pub(crate) fn parse(mut ctx: Ctx) -> Result<AST, AST> {
+pub(crate) fn parse(mut ctx: Ctx) -> Result<(Option<String>, AST), (Option<String>, AST)> {
 	t!("---- begin parse ----");
+
+	let frontmatter = if ctx.document {
+		frontmatter(&mut ctx)
+	} else {
+		None
+	};
 
 	// significance tracks functionally-empty lines, splitting paragraphs at functionally-empty lines
 	let mut last_significant = false;
@@ -945,7 +994,6 @@ pub(crate) fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 
 					ctx.stack.push(StackPart::Section {
 						pos: start,
-						level: indent_level + ctx.find_parent_indent() + 1,
 						name,
 						children: Vec::new(),
 					});
@@ -1096,9 +1144,5 @@ pub(crate) fn parse(mut ctx: Ctx) -> Result<AST, AST> {
 
 	t!("---- end parse ----");
 
-	if ctx.doll.ok {
-		Ok(ast)
-	} else {
-		Err(ast)
-	}
+	(if ctx.doll.ok { Ok } else { Err })((frontmatter, ast))
 }

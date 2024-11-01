@@ -1,14 +1,24 @@
 use {
-	crate::{args, ext::TagDefinition, tree::AST},
+	crate::{
+		args,
+		emit::HtmlEmit,
+		ext::TagDefinition,
+		tree::{TagContent, AST},
+		MarkDoll,
+	},
+	::alloc::format,
 	alloc::{
 		boxed::Box,
 		string::{String, ToString},
 	},
 };
 
+/// the link destination and visuals
 #[derive(Debug)]
-struct Link {
+pub struct Link {
+	/// the destination
 	pub href: String,
+	/// the visuals
 	pub ast: AST,
 }
 
@@ -24,47 +34,54 @@ struct Link {
 /// # content
 ///
 /// markdoll, used as the content of the link
-pub const LINK_TAG: TagDefinition = TagDefinition {
-	key: "link",
-	parse: Some(|doll, mut args, text| {
-		args! {
-			doll, args;
+pub mod link {
+	use super::*;
 
-			args(href: String);
-			opt_args();
-			flags();
-			props();
-		};
+	/// the tag
+	#[must_use]
+	pub fn tag() -> TagDefinition {
+		TagDefinition::new(
+			"link",
+			Some(|doll, mut args, text| {
+				args! {
+					doll, args;
 
-		Some(Box::new(Link {
-			href,
-			ast: match doll.parse(text) {
-				Ok(ast) => ast,
-				Err(ast) => {
-					doll.ok = false;
-					ast
-				}
-			},
-		}))
-	}),
-	emit: |doll, to, content| {
+					args(href: String);
+					opt_args();
+					flags();
+					props();
+				};
+
+				Some(Box::new(Link {
+					href,
+					ast: match doll.parse(text) {
+						Ok(ast) => ast,
+						Err(ast) => {
+							doll.ok = false;
+							ast
+						}
+					},
+				}))
+			}),
+		)
+		.with_emitter::<HtmlEmit>(html)
+	}
+
+	/// emit to html
+	pub fn html(doll: &mut MarkDoll, to: &mut HtmlEmit, content: &mut Box<dyn TagContent>) {
 		let link = content.downcast_mut::<Link>().unwrap();
 
-		write!(to, "<a href='{}'>", &html_escape::encode_safe(&link.href)).unwrap();
+		to.write.push_str(&format!(
+			"<a href='{}'>",
+			&html_escape::encode_safe(&link.href)
+		));
 
-		let block = link.ast.len() > 1;
 		for item in &mut link.ast {
-			item.emit(doll, to, block);
+			item.emit(doll, to);
 		}
 
-		to.write_str("</a>").unwrap();
-	},
-};
-
-#[derive(Debug)]
-struct Image {
-	pub src: String,
-	pub alt: String,
+		to.write.push_str("</a>");
+	}
 }
 
 /// `img` tag
@@ -79,35 +96,51 @@ struct Image {
 /// # content
 ///
 /// text, alt text of the image
-pub const IMG_TAG: TagDefinition = TagDefinition {
-	key: "img",
-	parse: Some(|doll, mut args, text| {
-		args! {
-			doll, args;
+pub mod image {
+	use super::*;
 
-			args(src: String);
-			opt_args();
-			flags();
-			props();
-		};
+	/// the image source and alt text
+	#[derive(Debug)]
+	struct Image {
+		pub src: String,
+		pub alt: String,
+	}
 
-		Some(Box::new(Image {
-			src,
-			alt: text.to_string(),
-		}))
-	}),
-	emit: |_, to, content| {
+	/// the tag
+	#[must_use]
+	pub fn tag() -> TagDefinition {
+		TagDefinition::new(
+			"img",
+			Some(|doll, mut args, text| {
+				args! {
+					doll, args;
+
+					args(src: String);
+					opt_args();
+					flags();
+					props();
+				};
+
+				Some(Box::new(Image {
+					src,
+					alt: text.to_string(),
+				}))
+			}),
+		)
+		.with_emitter::<HtmlEmit>(html)
+	}
+
+	/// emit to html
+	pub fn html(_: &mut MarkDoll, to: &mut HtmlEmit, content: &mut Box<dyn TagContent>) {
 		let img = content.downcast_mut::<Image>().unwrap();
 
-		write!(
-			to,
+		to.write.push_str(&format!(
 			"<img src='{}' alt='{}' />",
 			&html_escape::encode_safe(&img.src),
 			&html_escape::encode_safe(&img.alt)
-		)
-		.unwrap();
-	},
-};
+		));
+	}
+}
 
 /// `def` tag
 ///
@@ -124,44 +157,55 @@ pub const IMG_TAG: TagDefinition = TagDefinition {
 ///
 /// # implementation
 ///
-/// defines the `ref-<id>` HTML id, replacing `<id>` with the `id` argument
-pub const DEF_TAG: TagDefinition = TagDefinition {
-	key: "def",
-	parse: Some(|doll, mut args, text| {
-		args! {
-			doll, args;
+/// when emitting to [`HtmlEmit`], defines the `ref-<id>` HTML id, replacing `<id>` with the `id` argument
+pub mod definition {
+	use super::*;
 
-			args(href: String);
-			opt_args();
-			flags();
-			props();
-		};
+	/// the tag
+	#[must_use]
+	pub fn tag() -> TagDefinition {
+		TagDefinition::new(
+			"def",
+			Some(|doll, mut args, text| {
+				args! {
+					doll, args;
 
-		Some(Box::new(Link {
-			href,
-			ast: match doll.parse(text) {
-				Ok(ast) => ast,
-				Err(ast) => {
-					doll.ok = false;
-					ast
-				}
-			},
-		}))
-	}),
-	emit: |doll, to, content| {
+					args(href: String);
+					opt_args();
+					flags();
+					props();
+				};
+
+				Some(Box::new(Link {
+					href,
+					ast: match doll.parse(text) {
+						Ok(ast) => ast,
+						Err(ast) => {
+							doll.ok = false;
+							ast
+						}
+					},
+				}))
+			}),
+		)
+		.with_emitter::<HtmlEmit>(html)
+	}
+
+	/// emit to html
+	pub fn html(doll: &mut MarkDoll, to: &mut HtmlEmit, content: &mut Box<dyn TagContent>) {
 		let link = content.downcast_mut::<Link>().unwrap();
 
 		let href = &html_escape::encode_safe(&link.href);
-		write!(to, "<div class='doll-ref' id='ref-{href}'>[{href}]: ").unwrap();
+		to.write
+			.push_str(&format!("<div class='doll-ref' id='ref-{href}'>[{href}]: "));
 
-		let block = link.ast.len() > 1;
 		for item in &mut link.ast {
-			item.emit(doll, to, block);
+			item.emit(doll, to);
 		}
 
-		to.write_str("</div>").unwrap();
-	},
-};
+		to.write.push_str("</div>");
+	}
+}
 
 /// `ref` tag
 ///
@@ -174,31 +218,51 @@ pub const DEF_TAG: TagDefinition = TagDefinition {
 ///
 /// # implementation
 ///
-/// links to the `ref-<id>` HTML id, replacing `<id>` with the `id` argument
-pub const REF_TAG: TagDefinition = TagDefinition {
-	key: "ref",
-	parse: Some(|doll, mut args, text| {
-		args! {
-			doll, args;
+/// when emitting to [`HtmlEmit`], links to the `ref-<id>` HTML id, replacing `<id>` with the `id` argument
+pub mod reference {
+	use super::*;
 
-			args(href: String);
-			opt_args();
-			flags();
-			props();
-		};
+	/// the tag
+	#[must_use]
+	pub fn tag() -> TagDefinition {
+		TagDefinition::new(
+			"ref",
+			Some(|doll, mut args, text| {
+				args! {
+					doll, args;
 
-		if !text.is_empty() {
-			doll.diag(true, usize::MAX, "cannot have content");
-		}
+					args(href: String);
+					opt_args();
+					flags();
+					props();
+				};
 
-		Some(Box::new(href))
-	}),
-	emit: |_, to, content| {
+				if !text.is_empty() {
+					doll.diag(true, usize::MAX, "cannot have content");
+				}
+
+				Some(Box::new(href))
+			}),
+		)
+		.with_emitter::<HtmlEmit>(html)
+	}
+
+	/// emit to html
+	pub fn html(_: &mut MarkDoll, to: &mut HtmlEmit, content: &mut Box<dyn TagContent>) {
 		let href = content.downcast_ref::<String>().unwrap();
 
-		write!(to, "<sup><a href='#ref-{href}'>[{href}]</a></sup>").unwrap();
-	},
-};
+		to.write
+			.push_str(&format!("<sup><a href='#ref-{href}'>[{href}]</a></sup>"));
+	}
+}
 
 /// all of this module's tags
-pub const TAGS: &[TagDefinition] = &[LINK_TAG, IMG_TAG, DEF_TAG, REF_TAG];
+#[must_use]
+pub fn tags() -> [TagDefinition; 4] {
+	[
+		link::tag(),
+		image::tag(),
+		definition::tag(),
+		reference::tag(),
+	]
+}

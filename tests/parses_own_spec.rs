@@ -1,4 +1,6 @@
 use {
+	::hashbrown::HashMap,
+	::markdoll::emit::{BuiltInEmitters, HtmlEmit},
 	ariadne::Source,
 	markdoll::{diagnostics::render, ext, MarkDoll},
 };
@@ -15,27 +17,39 @@ pub fn parses_own_spec() {
 
 	const SRC: &'static str = include_str!("../spec.doll");
 
-	let mut out = String::new();
+	let mut out = HtmlEmit {
+		write: String::new(),
+		section_level: 0,
+		code_block_format: HashMap::new(),
+	};
+
+	out.code_block_format
+		.insert("doll", |_: &mut MarkDoll, to: &mut HtmlEmit, text: &str| {
+			to.write
+				.push_str(&format!("<pre>{}</pre>", &html_escape::encode_text(&text)));
+		});
 
 	let mut doll = MarkDoll::new();
-	doll.ext_system.add_tags(ext::common::TAGS);
-	doll.ext_system.add_tags(ext::formatting::TAGS);
-	doll.ext_system.add_tags(ext::code::TAGS);
-	doll.ext_system.add_tags(ext::links::TAGS);
-	doll.ext_system.add_tags(ext::table::TAGS);
+	doll.ext_system.add_tags(ext::common::tags());
+	doll.ext_system.add_tags(ext::formatting::tags());
+	doll.ext_system.add_tags(ext::code::tags());
+	doll.ext_system.add_tags(ext::links::tags());
+	doll.ext_system.add_tags(ext::table::tags());
+	doll.set_emitters(BuiltInEmitters::<HtmlEmit>::default());
 
 	println!("parse");
 
 	let mut ok = true;
 
-	match doll.parse(SRC) {
-		Ok(mut ast) => {
+	match doll.parse_document(SRC) {
+		Ok((frontmatter, mut ast)) => {
+			println!("frontmatter: {frontmatter:?}");
 			println!("emitting");
 
 			if doll.emit(&mut ast, &mut out) {
 				println!("output written to spec.html");
 
-				std::fs::write("./spec.html", out).unwrap();
+				std::fs::write("./spec.html", out.write).unwrap();
 			} else {
 				println!("emit failed");
 				ok = false;

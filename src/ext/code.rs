@@ -1,5 +1,6 @@
 use {
-	crate::{args, ext::TagDefinition},
+	crate::{args, emit::HtmlEmit, ext::TagDefinition, tree::TagContent, MarkDoll},
+	::alloc::format,
 	alloc::{
 		boxed::Box,
 		string::{String, ToString},
@@ -13,23 +14,23 @@ use {
 /// # content
 ///
 /// anything
-pub const CODE_TAG: TagDefinition = TagDefinition {
-	key: "code",
-	parse: Some(|_, _, text| Some(Box::new(text.to_string()))),
-	emit: |_, to, content| {
-		write!(
-			to,
+pub mod code {
+	use super::*;
+
+	/// the tag
+	#[must_use]
+	pub fn tag() -> TagDefinition {
+		TagDefinition::new("code", Some(|_, _, text| Some(Box::new(text.to_string()))))
+			.with_emitter::<HtmlEmit>(html)
+	}
+
+	/// emit to html
+	pub fn html(_: &mut MarkDoll, to: &mut HtmlEmit, content: &mut Box<dyn TagContent>) {
+		to.write.push_str(&format!(
 			"<code>{}</code>",
 			content.downcast_ref::<String>().unwrap()
-		)
-		.unwrap();
-	},
-};
-
-#[derive(Debug)]
-struct Block {
-	pub lang: Option<String>,
-	pub text: String,
+		));
+	}
 }
 
 /// `codeblock` tag
@@ -44,57 +45,67 @@ struct Block {
 /// # content
 ///
 /// anything
-pub const CODEBLOCK_TAG: TagDefinition = TagDefinition {
-	key: "codeblock",
-	parse: Some(|doll, mut args, text| {
-		args! {
-			doll, args;
+pub mod codeblock {
+	use super::*;
 
-			args();
-			opt_args(lang: String);
-			flags(i, b, u, s, h, q);
-			props();
-		};
+	/// represents the language and content
+	#[derive(Debug)]
+	pub struct Block {
+		/// the language
+		pub lang: Option<String>,
+		/// the text
+		pub text: String,
+	}
 
-		Some(Box::new(Block {
-			lang,
-			text: text.to_string(),
-		}))
-	}),
-	emit: |doll, to, content| {
+	/// the tag
+	#[must_use]
+	pub fn tag() -> TagDefinition {
+		TagDefinition::new(
+			"codeblock",
+			Some(|doll, mut args, text| {
+				args! {
+					doll, args;
+
+					args();
+					opt_args(lang: String);
+					flags();
+					props();
+				};
+
+				Some(Box::new(Block {
+					lang,
+					text: text.to_string(),
+				}))
+			}),
+		)
+		.with_emitter::<HtmlEmit>(html)
+	}
+
+	/// emit to html
+	pub fn html(doll: &mut MarkDoll, to: &mut HtmlEmit, content: &mut Box<dyn TagContent>) {
 		let code = content.downcast_ref::<Block>().unwrap();
 
 		if let Some(lang) = &code.lang {
-			write!(
-				to,
-				"<div class='doll-code-block' data-lang='{}'><pre>",
-				&html_escape::encode_safe(&lang)
-			)
-			.unwrap();
-
-			if let Some(emitter) = doll.code_block.get(lang) {
+			if let Some(emitter) = to.code_block_format.get(&**lang) {
 				(emitter)(doll, to, &code.text);
 			} else {
-				write!(
-					to,
+				to.write.push_str(&format!(
 					"<div class='doll-code-block'><pre>{}</pre></div>",
 					&html_escape::encode_text(&code.text)
-				)
-				.unwrap();
-				//doll.diag(true, usize::MAX, "language does not exist");
+				));
+				doll.diag(false, usize::MAX, "language does not exist");
 			}
-
-			to.write_str("</pre></div>").unwrap();
 		} else {
-			write!(
-				to,
+			to.write.push_str(&format!(
 				"<div class='doll-code-block'><pre>{}</pre></div>",
 				&html_escape::encode_text(&code.text)
-			)
-			.unwrap();
+			));
 		}
-	},
-};
+	}
+}
 
 /// all of this module's tags
-pub const TAGS: &[TagDefinition] = &[CODE_TAG, CODEBLOCK_TAG];
+#[must_use]
+pub fn tags() -> [TagDefinition; 2] {
+	[code::tag(), codeblock::tag()]
+}

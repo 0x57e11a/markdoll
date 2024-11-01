@@ -1,30 +1,43 @@
 use {
 	crate::{
 		args,
+		emit::HtmlEmit,
 		ext::TagDefinition,
-		tree::{BlockItem, InlineItem, TagInvocation, AST},
+		tree::{BlockItem, InlineItem, TagContent, TagInvocation, AST},
 		MarkDoll,
 	},
+	::alloc::format,
 	alloc::{boxed::Box, vec::Vec},
 };
 
+/// a table cell
 #[derive(Debug)]
-struct Cell {
+pub struct Cell {
+	/// whether this cell is a head cell
 	pub is_head: bool,
+	/// how many rows to span
 	pub rows: usize,
+	/// how many columns to span
 	pub cols: usize,
+	/// content
 	pub content: AST,
 }
 
+/// a table row
 #[derive(Debug)]
-struct Row {
+pub struct Row {
+	/// whether this row is a head row, which is placed in the `head` section of the table
 	pub is_head: bool,
+	/// the cells on this row
 	pub cells: Vec<Cell>,
 }
 
+/// a table
 #[derive(Debug)]
-struct Table {
+pub struct Table {
+	/// `<thead>` section
 	pub head: Vec<Row>,
+	/// `<tbody>` section
 	pub body: Vec<Row>,
 }
 
@@ -79,132 +92,142 @@ fn parse_row(doll: &mut MarkDoll, ast: AST) -> Vec<Cell> {
 /// - [`tr`](TBLROW_TAG) tags
 /// - ordered lists (header rows)
 /// - unordered lists (body rows)
-pub const TBL_TAG: TagDefinition = TagDefinition {
-	key: "table",
-	parse: Some(|doll, _, text| {
-		#[track_caller]
-		fn fail(doll: &mut MarkDoll, pos: usize) {
-			doll.diag(
-				true,
-				pos,
-				"table tags may only contain lists and table row tags",
-			);
-		}
+pub mod table {
+	use super::*;
 
-		let ast = match doll.parse(text) {
-			Ok(ast) => ast,
-			Err(ast) => {
-				doll.ok = false;
-				ast
-			}
-		};
+	/// the tag
+	#[must_use]
+	pub fn tag() -> TagDefinition {
+		TagDefinition::new(
+			"table",
+			Some(|doll, _, text| {
+				#[track_caller]
+				fn fail(doll: &mut MarkDoll, pos: usize) {
+					doll.diag(
+						true,
+						pos,
+						"table tags may only contain lists and table row tags",
+					);
+				}
 
-		let mut table = Table {
-			head: Vec::new(),
-			body: Vec::new(),
-		};
+				let ast = match doll.parse(text) {
+					Ok(ast) => ast,
+					Err(ast) => {
+						doll.ok = false;
+						ast
+					}
+				};
 
-		for child in ast {
-			match child {
-				BlockItem::Inline(items) => {
-					for (pos, item) in items {
-						match item {
-							InlineItem::Tag(TagInvocation { content, .. }) => {
-								if let Ok(row) = content.downcast::<Row>() {
-									if row.is_head {
-										table.head.push(*row);
-									} else {
-										table.body.push(*row);
+				let mut table = Table {
+					head: Vec::new(),
+					body: Vec::new(),
+				};
+
+				for child in ast {
+					match child {
+						BlockItem::Inline(items) => {
+							for (pos, item) in items {
+								match item {
+									InlineItem::Tag(TagInvocation { content, .. }) => {
+										if let Ok(row) = content.downcast::<Row>() {
+											if row.is_head {
+												table.head.push(*row);
+											} else {
+												table.body.push(*row);
+											}
+										} else {
+											fail(doll, pos);
+										}
 									}
-								} else {
-									fail(doll, pos);
+									_ => fail(doll, pos),
 								}
 							}
-							_ => fail(doll, pos),
 						}
+						BlockItem::List { ordered, items, .. } => {
+							for item in items {
+								let row = Row {
+									is_head: ordered,
+									cells: parse_row(doll, item),
+								};
+
+								if row.is_head {
+									table.head.push(row);
+								} else {
+									table.body.push(row);
+								}
+							}
+						}
+						BlockItem::Section { pos, .. } => fail(doll, pos),
 					}
 				}
-				BlockItem::List { ordered, items, .. } => {
-					for item in items {
-						let row = Row {
-							is_head: ordered,
-							cells: parse_row(doll, item),
-						};
 
-						if row.is_head {
-							table.head.push(row);
-						} else {
-							table.body.push(row);
-						}
-					}
-				}
-				BlockItem::Section { pos, .. } => fail(doll, pos),
-			}
-		}
+				Some(Box::new(table))
+			}),
+		)
+		.with_emitter::<HtmlEmit>(html)
+	}
 
-		Some(Box::new(table))
-	}),
-	emit: |doll, to, content| {
-		fn write_cell(doll: &mut MarkDoll, to: &mut dyn core::fmt::Write, cell: &mut Cell) {
+	/// emit to html
+	pub fn html(doll: &mut MarkDoll, to: &mut HtmlEmit, content: &mut Box<dyn TagContent>) {
+		fn write_cell(doll: &mut MarkDoll, to: &mut HtmlEmit, cell: &mut Cell) {
 			let kind = if cell.is_head { "th" } else { "td" };
-			write!(to, "<{kind}").unwrap();
+			to.write.push_str(&format!("<{kind}"));
 
 			if cell.rows != 1 {
-				write!(to, " rowspan='{}'", cell.rows).unwrap();
+				to.write.push_str(&format!(" rowspan='{}'", cell.rows));
 			}
 			if cell.cols != 1 {
-				write!(to, " colspan='{}'", cell.cols).unwrap();
+				to.write.push_str(&format!(" colspan='{}'", cell.cols));
 			}
 
-			to.write_str(">").unwrap();
+			to.write.push('>');
 
-			let block = cell.content.len() > 1;
 			for content in &mut cell.content {
-				content.emit(doll, to, block);
+				content.emit(doll, to);
 			}
 
-			write!(to, "</{kind}>").unwrap();
+			to.write.push_str(&format!("</{kind}>"));
 		}
 
 		let table = content.downcast_mut::<Table>().unwrap();
 
-		to.write_str("<table>").unwrap();
+		to.write.push_str("<table>");
 
 		if !table.head.is_empty() {
-			to.write_str("<thead>").unwrap();
+			to.write.push_str("<thead>");
 
 			for row in &mut table.head {
-				to.write_str("<tr>").unwrap();
+				to.write.push_str("<tr>");
 
 				for cell in &mut row.cells {
 					write_cell(doll, to, cell);
 				}
 
-				to.write_str("</tr>").unwrap();
+				to.write.push_str("</tr>");
 			}
 
-			to.write_str("</thead>").unwrap();
+			to.write.push_str("</thead>");
 		}
 
 		if !table.body.is_empty() {
-			to.write_str("<tbody>").unwrap();
+			to.write.push_str("<tbody>");
 
 			for row in &mut table.body {
-				to.write_str("<tr>").unwrap();
+				to.write.push_str("<tr>");
 
 				for cell in &mut row.cells {
 					write_cell(doll, to, cell);
 				}
 
-				to.write_str("</tr>").unwrap();
+				to.write.push_str("</tr>");
 			}
 
-			to.write_str("</tbody>").unwrap();
+			to.write.push_str("</tbody>");
 		}
 
-		to.write_str("</table>").unwrap();
-	},
-};
+		to.write.push_str("</table>");
+	}
+}
 
 /// `tr` tag
 ///
@@ -221,36 +244,45 @@ pub const TBL_TAG: TagDefinition = TagDefinition {
 /// - [`tc`](TBLCELL_TAG) tags
 /// - ordered lists (header cells)
 /// - unordered lists (body cells)
-pub const TBLROW_TAG: TagDefinition = TagDefinition {
-	key: "tr",
-	parse: Some(|doll, mut args, text| {
-		args! {
-			doll, args;
+///
+/// # emitting
+///
+/// this tag will never be emitted when used properly, do not add an emitter to it
+pub mod tr {
+	use super::*;
 
-			args();
-			opt_args();
-			flags(head);
-			props();
-		}
+	/// the tag
+	#[must_use]
+	pub fn tag() -> TagDefinition {
+		TagDefinition::new(
+			"tr",
+			Some(|doll, mut args, text| {
+				args! {
+					doll, args;
 
-		Some(Box::new(Row {
-			is_head: head,
-			cells: {
-				let ast = match doll.parse(text) {
-					Ok(ast) => ast,
-					Err(ast) => {
-						doll.ok = false;
-						ast
-					}
-				};
-				parse_row(doll, ast)
-			},
-		}))
-	}),
-	emit: |doll, _, _| {
-		doll.diag(true, usize::MAX, "tblrow outside of tbl");
-	},
-};
+					args();
+					opt_args();
+					flags(head);
+					props();
+				}
+
+				Some(Box::new(Row {
+					is_head: head,
+					cells: {
+						let ast = match doll.parse(text) {
+							Ok(ast) => ast,
+							Err(ast) => {
+								doll.ok = false;
+								ast
+							}
+						};
+						parse_row(doll, ast)
+					},
+				}))
+			}),
+		)
+	}
+}
 
 /// `tc` tag
 ///
@@ -271,35 +303,47 @@ pub const TBLROW_TAG: TagDefinition = TagDefinition {
 /// # content
 ///
 /// markdoll
-pub const TBLCELL_TAG: TagDefinition = TagDefinition {
-	key: "tc",
-	parse: Some(|doll, mut args, text| {
-		args! {
-			doll, args;
+///
+/// # emitting
+///
+/// this tag will never be emitted when used properly, do not add an emitter to it
+pub mod tc {
+	use super::*;
 
-			args();
-			opt_args();
-			flags(head);
-			props(rows: usize, cols: usize);
-		}
+	/// the tag
+	#[must_use]
+	pub fn tag() -> TagDefinition {
+		TagDefinition::new(
+			"tc",
+			Some(|doll, mut args, text| {
+				args! {
+					doll, args;
 
-		Some(Box::new(Cell {
-			is_head: head,
-			rows: rows.unwrap_or(1),
-			cols: cols.unwrap_or(1),
-			content: match doll.parse(text) {
-				Ok(ast) => ast,
-				Err(ast) => {
-					doll.ok = false;
-					ast
+					args();
+					opt_args();
+					flags(head);
+					props(rows: usize, cols: usize);
 				}
-			},
-		}))
-	}),
-	emit: |doll, _, _| {
-		doll.diag(true, usize::MAX, "table(cell) outside of table");
-	},
-};
+
+				Some(Box::new(Cell {
+					is_head: head,
+					rows: rows.unwrap_or(1),
+					cols: cols.unwrap_or(1),
+					content: match doll.parse(text) {
+						Ok(ast) => ast,
+						Err(ast) => {
+							doll.ok = false;
+							ast
+						}
+					},
+				}))
+			}),
+		)
+	}
+}
 
 /// all of this module's tags
-pub const TAGS: &[TagDefinition] = &[TBL_TAG, TBLROW_TAG, TBLCELL_TAG];
+#[must_use]
+pub fn tags() -> [TagDefinition; 3] {
+	[table::tag(), tr::tag(), tc::tag()]
+}
