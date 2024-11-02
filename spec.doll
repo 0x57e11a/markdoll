@@ -73,8 +73,15 @@ awawa!
 			most parts of markdoll support escape sequences with the backslash character ([code:\\])
 
 			for example:
-			-	[code:[em:\\\\[\\\\]]] results in: [em:\\[\\]]
-			-	[code:hello \\[world\\]] results in: hello \[world]
+			-	[code:[em:\\\]]] results in: [em:\]]
+			-	[code:[em:\\\\]] results in: [em:\\\\]
+
+			inline tags do not need to escape [em:balanced] square brackets, however
+			-	[code:[em:]\]] is [em:unbalanced] and will end early
+			-	[code:[em:[]]] is [em:balanced] and will not end early
+
+			block tags completely ignore escaping/balancing, their content is fed as-is into the tag, after the indentation of the tag + 1 has been stripped.
+			they dont have to care about escaping/balancing because the only way to terminate them is to lower the indentation again, which isnt something that could be escaped
 		&lists
 			unordered and ordered lists are also easy:
 
@@ -138,13 +145,13 @@ awawa!
 		markdoll and its standard library emits HTML by default, but it doesn't have to!
 
 		markdoll does not load [em:any] tags automatically, all of them must be manually inserted.
-		the standard library all emit HTML, but their source code can be read and copied if a different result is required
+		the standard library all supports HTML by default, and can be extended with other targets
 
 		&standard extensions
-			the standard library is located in the modules exported in [code:markdoll::ext]
+			the standard library is in the [code:markdoll::ext] module
 
 			&common
-				located in [code:markdoll::ext::common]
+				in module [code:markdoll::ext::common]
 
 				[table::
 					=	=	tag
@@ -154,7 +161,7 @@ awawa!
 						=	result
 
 					-	[tc(head)(rows=2):[code://]]
-						[tc(rows=2):[code:COMMENT_TAG]]
+						[tc(rows=2):[code:comment::tag]]
 						[tc(rows=2):the comment tag is very simple, its content is not parsed and is excluded from the output]
 						-	[codeblock(doll)::
 								[//:this will not be included in the output]
@@ -174,7 +181,7 @@ awawa!
 							]
 				]
 			&formatting
-				located in [code:markdoll::ext::formatting]
+				in module [code:markdoll::ext::formatting]
 
 				[table::
 					=	=	tag
@@ -184,7 +191,7 @@ awawa!
 						=	result
 
 					-	[tc(head)(rows=8):[code:em]]
-						[tc(rows=8):[code:EMPHASIS_TAG]]
+						[tc(rows=8):[code:em::tag]]
 						[tc(rows=8)::
 							apply one or more forms of emphasis to the content
 
@@ -221,7 +228,7 @@ awawa!
 						-	[em(i)(b)(u)(s)(h)(q):everything]
 
 					-	[tc(head)(rows=2):[code:quote]]
-						[tc(rows=2):[code:QUOTE_TAG]]
+						[tc(rows=2):[code:quote::tag]]
 						[tc(rows=2)::
 							block quotes
 
@@ -245,7 +252,7 @@ awawa!
 							]
 				]
 			&code
-				located in [code:markdoll::ext::code]
+				in module [code:markdoll::ext::code]
 
 				[table::
 					=	=	tag
@@ -255,13 +262,13 @@ awawa!
 						=	result
 
 					-	=	[code:code]
-						-	[code:CODE_TAG]
+						-	[code:code::tag]
 						-	inline code blocks
 						-	[codeblock:[code:whatever code goes here, it is not [parsed] whatsoever]]
 						-	[code:whatever code goes here, it is not [parsed] whatsoever]
 
 					-	[tc(head)(rows=2):[code:codeblock]]
-						[tc(rows=2):[code:CODEBLOCK_TAG]]
+						[tc(rows=2):[code:codeblock::tag]]
 						[tc(rows=2)::
 							code blocks with an optional language code
 
@@ -287,7 +294,7 @@ awawa!
 							]
 				]
 			&links
-				located in [code:markdoll::ext::links]
+				in module [code:markdoll::ext::links]
 
 				[table::
 					=	=	tag
@@ -297,19 +304,19 @@ awawa!
 						=	result
 
 					-	=	[code:link]
-						-	[code:LINK_TAG]
+						-	[code:link::tag]
 						-	link to content
 						-	[codeblock:[link(https://github.com/0x57e11a/markdoll):markdoll]]
 						-	[link(https://github.com/0x57e11a/markdoll):markdoll]
 
 					-	=	[code:img]
-						-	[code:IMG_TAG]
+						-	[code:img::tag]
 						-	insert images
-						-	[codeblock:[img(https://raw.githubusercontent.com/0x57e11a/markdoll/main/button.png):MADE WITH MARKDOLL]]
-						-	[img(https://raw.githubusercontent.com/0x57e11a/markdoll/main/button.png):MADE WITH MARKDOLL]
+						-	[codeblock:[img(https://raw.githubusercontent.com/0x57e11a/markdoll/main/button.png):alt text goes here (88x31 button that says MADE WITH MARKDOLL)]]
+						-	[img(https://raw.githubusercontent.com/0x57e11a/markdoll/main/button.png):alt text goes here (88x31 button that says MADE WITH MARKDOLL)]
 
 					-	=	[code:def]
-						-	[code:DEF_TAG]
+						-	[code:def::tag]
 						-	in-page anchors to be used with the [code:ref] tag
 
 							defines the `ref-<id>` HTML id, replacing `<id>` with the id argument
@@ -317,7 +324,7 @@ awawa!
 						-	[def(def-tag):this is a definition for def-tag using the def tag, maybe a bit meta?]
 
 					-	=	[code:ref]
-						-	[code:REF_TAG]
+						-	[code:ref::tag]
 						-	link to an anchor defined by the [code:def] tag
 
 							links to the `ref-<id>` HTML id, replacing `<id>` with the id argument
@@ -325,7 +332,7 @@ awawa!
 						-	this is a reference[ref(def-tag)]
 				]
 			&table
-				located in [code:markdoll::ext::table]
+				in module [code:markdoll::ext::table]
 
 				[table::
 					=	=	tag
@@ -335,7 +342,7 @@ awawa!
 						=	result
 
 					-	[tc(head)(rows=2):[code:table]]
-						[tc(rows=2):[code:TBL_TAG]]
+						[tc(rows=2):[code:table::tag]]
 						[tc(rows=2)::
 							tables
 
@@ -416,7 +423,7 @@ awawa!
 							]
 
 					-	[tc(head)(rows=2):[code:tr]]
-						[tc(rows=2):[code:TBLROW_TAG]]
+						[tc(rows=2):[code:tr::tag]]
 						[tc(rows=2)::
 							create table rows inside tables
 
@@ -448,7 +455,7 @@ awawa!
 							]
 
 					-	[tc(head)(rows=4):[code:tc]]
-						[tc(rows=4):[code:TBLCELL_TAG]]
+						[tc(rows=4):[code:tc::tag]]
 						[tc(rows=4)::
 							create table cells inside table rows
 
