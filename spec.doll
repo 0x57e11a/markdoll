@@ -141,6 +141,24 @@ awawa!
 
 			when emitting to HTML, it is not recommended to have more than one top-level section,
 			as multiple h1 elements causes accessibility issues
+		&frontmatter
+			markdoll differentiates between parsing as a [em:document] and everything else:
+			-	each tag parses its content as embedded markdoll source, so frontmatter would not be parsed in these situations
+			-	but when parsing a main document via [code:parse_document], frontmatter is permitted.
+
+			frontmatter works almost identically to the way it does in many other markup languages,
+			with an optional section at the very beginning of a file that is fenced with [code:---]:
+
+			[codeblock(doll)::
+				---
+				whatever
+				---
+
+				normal content goes here
+			]
+
+			while many parsers choose to parse frontmatter as [link(https://yaml.org/):YAML] or [link(https://toml.io/):TOML],
+			markdoll does not wish to take part in the war between the two, and just returns it as a string
 	&extensibility
 		markdoll and its standard library emits HTML by default, but it doesn't have to!
 
