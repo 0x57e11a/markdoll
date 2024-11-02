@@ -21,7 +21,7 @@ pub struct HtmlEmit {
 #[derive(Debug)]
 pub struct BuiltInEmitters<To> {
 	/// how to emit [`BlockItem::Inline`](crate::tree::BlockItem::Inline)
-	pub inline: fn(doll: &mut MarkDoll, to: &mut To, segments: &mut [(usize, InlineItem)]),
+	pub inline: fn(doll: &mut MarkDoll, to: &mut To, segments: &mut [(usize, InlineItem)], inline_block: bool),
 	/// how to emit [`BlockItem::Section`](crate::tree::BlockItem::Section)
 	pub section: fn(doll: &mut MarkDoll, to: &mut To, name: &str, children: &mut AST),
 	/// how to emit [`BlockItem::List`](crate::tree::BlockItem::List)
@@ -34,8 +34,9 @@ impl BuiltInEmitters<HtmlEmit> {
 		doll: &mut MarkDoll,
 		to: &mut HtmlEmit,
 		segments: &mut [(usize, InlineItem)],
+		inline_block: bool,
 	) {
-		to.write.push_str("<div>");
+		to.write.push_str(if inline_block { "<div>" } else { "<span>" });
 
 		for (_, segment) in segments {
 			match segment {
@@ -48,7 +49,7 @@ impl BuiltInEmitters<HtmlEmit> {
 			}
 		}
 
-		to.write.push_str("</div>");
+		to.write.push_str(if inline_block { "</div>" } else { "</span>" });
 	}
 
 	/// the default [`BlockItem::Section`](crate::tree::BlockItem::Section) emitter
@@ -76,7 +77,7 @@ impl BuiltInEmitters<HtmlEmit> {
 		}
 
 		for child in children {
-			child.emit(doll, &mut *to);
+			child.emit(doll, &mut *to, true);
 		}
 
 		to.write.push_str("</div></section>");
@@ -93,7 +94,7 @@ impl BuiltInEmitters<HtmlEmit> {
 			to.write.push_str("<li>");
 
 			for child in item {
-				child.emit(doll, &mut *to);
+				child.emit(doll, &mut *to, true);
 			}
 
 			to.write.push_str("</li>");

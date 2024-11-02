@@ -102,7 +102,7 @@ pub enum BlockItem {
 
 impl BlockItem {
 	/// emit into an output
-	pub fn emit<To: 'static>(&mut self, doll: &mut MarkDoll, to: &mut To) {
+	pub fn emit<To: 'static>(&mut self, doll: &mut MarkDoll, to: &mut To, inline_block: bool) {
 		let builtin_emitters = doll
 			.builtin_emitters
 			.get_ref::<BuiltInEmitters<To>>()
@@ -110,7 +110,7 @@ impl BlockItem {
 
 		match self {
 			Self::Inline(segments) => {
-				(builtin_emitters.inline)(doll, to, segments);
+				(builtin_emitters.inline)(doll, to, segments, inline_block);
 			}
 			Self::Section { name, children, .. } => {
 				(builtin_emitters.section)(doll, to, name, children);

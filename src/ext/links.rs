@@ -76,8 +76,9 @@ pub mod link {
 			&html_escape::encode_safe(&link.href)
 		));
 
+		let inline_block = link.ast.len() > 1;
 		for item in &mut link.ast {
-			item.emit(doll, to);
+			item.emit(doll, to, inline_block);
 		}
 
 		to.write.push_str("</a>");
@@ -199,8 +200,9 @@ pub mod definition {
 		to.write
 			.push_str(&format!("<div class='doll-ref' id='ref-{href}'>[{href}]: "));
 
+		let inline_block = link.ast.len() > 1;
 		for item in &mut link.ast {
-			item.emit(doll, to);
+			item.emit(doll, to, inline_block);
 		}
 
 		to.write.push_str("</div>");

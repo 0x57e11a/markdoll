@@ -182,8 +182,9 @@ pub mod table {
 
 			to.write.push('>');
 
+			let inline_block = cell.content.len() > 1;
 			for content in &mut cell.content {
-				content.emit(doll, to);
+				content.emit(doll, to, inline_block);
 			}
 
 			to.write.push_str(&format!("</{kind}>"));

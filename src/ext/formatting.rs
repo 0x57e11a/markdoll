@@ -121,8 +121,9 @@ pub mod emphasis {
 			to.write.push_str("<q>");
 		}
 
+		let inline_block = em.ast.len() > 1;
 		for item in &mut em.ast {
-			item.emit(doll, to);
+			item.emit(doll, to, inline_block);
 		}
 
 		if em.quote {
@@ -218,8 +219,9 @@ pub mod quote {
 
 		to.write.push_str("<blockquote>");
 
+		let inline_block = quote.ast.len() > 1;
 		for item in &mut quote.ast {
-			item.emit(doll, to);
+			item.emit(doll, to, inline_block);
 		}
 
 		to.write.push_str("</blockquote></figure>");

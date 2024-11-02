@@ -177,7 +177,7 @@ impl MarkDoll {
 
 		self.ok = true;
 		for node in ast {
-			node.emit::<To>(self, to);
+			node.emit(self, to, true);
 		}
 		self.ok = ok;
 
