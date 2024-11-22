@@ -86,15 +86,7 @@ pub mod codeblock {
 		let code = content.downcast_ref::<Block>().unwrap();
 
 		if let Some(lang) = &code.lang {
-			if let Some(emitter) = to.code_block_format.get(&**lang) {
-				(emitter)(doll, to, &code.text);
-			} else {
-				to.write.push_str(&format!(
-					"<div class='doll-code-block'><pre>{}</pre></div>",
-					&html_escape::encode_text(&code.text)
-				));
-				doll.diag(false, usize::MAX, "language does not exist");
-			}
+			(to.code_block_format.clone())(doll, to, lang, &code.text);
 		} else {
 			to.write.push_str(&format!(
 				"<div class='doll-code-block'><pre>{}</pre></div>",

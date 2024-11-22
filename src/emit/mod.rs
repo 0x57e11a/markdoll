@@ -3,9 +3,16 @@ use {
 		tree::{InlineItem, AST},
 		MarkDoll,
 	},
-	::alloc::{format, string::String},
-	::hashbrown::HashMap,
+	::alloc::{format, rc::Rc, string::String},
 };
+
+/// emit a code block with a given language
+/// 
+/// - `doll` - markdoll instance
+/// - `emit` - emit target
+/// - `lang` - language requested
+/// - `src` - content
+pub type CodeBlockFormatter = dyn Fn(&mut MarkDoll, &mut HtmlEmit, &str, &str);
 
 /// emit to HTML
 pub struct HtmlEmit {
@@ -14,7 +21,7 @@ pub struct HtmlEmit {
 	/// heading level, initialize this to 0
 	pub section_level: usize,
 	/// defines how code block languages should be emitted
-	pub code_block_format: HashMap<&'static str, fn(doll: &mut MarkDoll, to: &mut HtmlEmit, text: &str)>,
+	pub code_block_format: Rc<CodeBlockFormatter>,
 }
 
 /// defines the behavior of built in [`BlockItem`](crate::tree::BlockItem)s
