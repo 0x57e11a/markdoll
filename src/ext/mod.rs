@@ -42,7 +42,8 @@ pub struct TagDefinition {
 
 impl TagDefinition {
 	/// create a new tag definition
-	fn new(key: &'static str, parse: Option<TagParser>) -> TagDefinition {
+	#[must_use]
+	pub fn new(key: &'static str, parse: Option<TagParser>) -> TagDefinition {
 		Self {
 			key,
 			parse,
