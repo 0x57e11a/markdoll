@@ -8,7 +8,7 @@ use {
 		emit::{BuiltInEmitters, HtmlEmit},
 		ext, MarkDoll,
 	},
-	std::io::Read,
+	std::{io::Read, rc::Rc},
 };
 
 #[derive(Parser, Debug)]
@@ -60,7 +60,7 @@ fn main() {
 				let mut out = HtmlEmit {
 					write: String::new(),
 					section_level: 0,
-					code_block_format: HashMap::new(),
+					code_block_format: Rc::new(|_, _, _, _| {}),
 				};
 
 				if doll.emit(&mut ast, &mut out) {

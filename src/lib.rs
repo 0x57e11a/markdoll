@@ -78,7 +78,10 @@ pub struct MarkDoll {
 
 	pub(crate) builtin_emitters: TypeMap,
 
-	pub(crate) ok: bool,
+	/// whether the current operation is "ok"
+	///
+	/// this shouldn't really be set to `true` by anything except the language
+	pub ok: bool,
 	pub(crate) diagnostics: Vec<Diagnostic>,
 	pub(crate) diagnostic_translations: Vec<TagDiagnosticTranslation>,
 }
