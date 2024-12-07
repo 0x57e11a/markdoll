@@ -1,6 +1,7 @@
 use {
 	::hashbrown::HashMap,
 	::markdoll::emit::{BuiltInEmitters, HtmlEmit},
+	::std::rc::Rc,
 	ariadne::Source,
 	markdoll::{diagnostics::render, ext, MarkDoll},
 };
@@ -20,14 +21,8 @@ pub fn parses_own_spec() {
 	let mut out = HtmlEmit {
 		write: String::new(),
 		section_level: 0,
-		code_block_format: HashMap::new(),
+		code_block_format: Rc::new(|_, _, _, _| {}),
 	};
-
-	out.code_block_format
-		.insert("doll", |_: &mut MarkDoll, to: &mut HtmlEmit, text: &str| {
-			to.write
-				.push_str(&format!("<pre>{}</pre>", &html_escape::encode_text(&text)));
-		});
 
 	let mut doll = MarkDoll::new();
 	doll.ext_system.add_tags(ext::common::tags());
