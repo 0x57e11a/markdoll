@@ -53,21 +53,22 @@ impl IndexedSrc {
 			lines
 		};
 
+		let parent_chars = parent.chars().collect::<Vec<char>>();
+
 		let parent_lines = {
 			let mut parent_lines = Vec::new();
 
 			let mut start = 0;
-			for line in parent[offset_in_parent.min(parent.len().saturating_sub(1))..]
-				.split('\n')
+			for line in parent_chars[offset_in_parent.min(parent.len().saturating_sub(1))..]
+				.split(|ch| *ch == '\n')
 				.take(lines.len())
 			{
 				let end = start + line.len() + 1;
 
-				let chars = line.chars().collect::<Vec<char>>();
 				let mut ind = 0;
 
 				for _ in 0..indent {
-					match t!("char", chars.get(ind)) {
+					match t!("char", line.get(ind)) {
 						Some('\t') => ind += 1,
 						Some('-' | '=') => ind += 2,
 						None => {}
