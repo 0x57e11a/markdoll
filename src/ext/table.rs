@@ -44,7 +44,7 @@ pub struct Table {
 fn parse_row(doll: &mut MarkDoll, ast: AST) -> Vec<Cell> {
 	#[track_caller]
 	fn fail(doll: &mut MarkDoll, pos: usize) {
-		doll.diag(true, pos, "tr may only lists and table cell tags");
+		doll.diag(true, pos, "tr tags may only contain lists and `tc` tags");
 	}
 
 	let mut cells = Vec::new();
@@ -106,7 +106,7 @@ pub mod table {
 					doll.diag(
 						true,
 						pos,
-						"table tags may only contain lists and table row tags",
+						"`table` tags may only contain lists and `tr` tags",
 					);
 				}
 
