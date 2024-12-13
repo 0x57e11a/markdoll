@@ -3,7 +3,7 @@ use {
 		tree::{InlineItem, AST},
 		MarkDoll,
 	},
-	::alloc::{format, rc::Rc, string::String},
+	::std::rc::Rc,
 };
 
 /// emit a code block with a given language

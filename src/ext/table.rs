@@ -1,13 +1,9 @@
-use {
-	crate::{
-		args,
-		emit::HtmlEmit,
-		ext::TagDefinition,
-		tree::{BlockItem, InlineItem, TagContent, TagInvocation, AST},
-		MarkDoll,
-	},
-	::alloc::format,
-	alloc::{boxed::Box, vec::Vec},
+use crate::{
+	args,
+	emit::HtmlEmit,
+	ext::TagDefinition,
+	tree::{BlockItem, InlineItem, TagContent, TagInvocation, AST},
+	MarkDoll,
 };
 
 /// a table cell

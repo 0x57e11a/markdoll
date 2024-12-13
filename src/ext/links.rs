@@ -1,16 +1,9 @@
-use {
-	crate::{
-		args,
-		emit::HtmlEmit,
-		ext::TagDefinition,
-		tree::{TagContent, AST},
-		MarkDoll,
-	},
-	::alloc::format,
-	alloc::{
-		boxed::Box,
-		string::{String, ToString},
-	},
+use crate::{
+	args,
+	emit::HtmlEmit,
+	ext::TagDefinition,
+	tree::{TagContent, AST},
+	MarkDoll,
 };
 
 /// the link destination and visuals

@@ -10,7 +10,7 @@ use {
 pub fn parses_own_spec() {
 	env_logger::builder()
 		.target(env_logger::Target::Pipe(Box::new(
-			std::fs::File::create("target/trace.txt").unwrap(),
+			::std::fs::File::create("target/trace.txt").unwrap(),
 		)))
 		.filter_level(log::LevelFilter::Trace)
 		.default_format()
@@ -44,7 +44,7 @@ pub fn parses_own_spec() {
 			if doll.emit(&mut ast, &mut out) {
 				println!("output written to spec.html");
 
-				std::fs::write("./spec.html", out.write).unwrap();
+				::std::fs::write("./spec.html", out.write).unwrap();
 			} else {
 				println!("emit failed");
 				ok = false;

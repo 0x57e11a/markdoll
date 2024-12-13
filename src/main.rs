@@ -1,14 +1,14 @@
 #![cfg(feature = "cli")]
 
 use {
-	clap::{Parser, Subcommand},
-	hashbrown::HashMap,
-	markdoll::{
+	::clap::{Parser, Subcommand},
+	::hashbrown::HashMap,
+	::markdoll::{
 		diagnostics,
 		emit::{BuiltInEmitters, HtmlEmit},
 		ext, MarkDoll,
 	},
-	std::{io::Read, rc::Rc},
+	::std::{io::Read, rc::Rc},
 };
 
 #[derive(Parser, Debug)]
@@ -33,7 +33,7 @@ fn main() {
 
 	let mut src = String::new();
 
-	std::io::stdin()
+	::std::io::stdin()
 		.read_to_string(&mut src)
 		.expect("failed to read stdin");
 
@@ -91,6 +91,6 @@ fn main() {
 		log::info!("end");
 	} else {
 		log::error!("failed");
-		std::process::exit(1);
+		::std::process::exit(1);
 	}
 }

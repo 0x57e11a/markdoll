@@ -1,20 +1,16 @@
 pub(crate) mod parser;
 
-use {
-	crate::{emit::BuiltInEmitters, MarkDoll, TagDiagnosticTranslation},
-	alloc::{boxed::Box, string::String, vec::Vec},
-	downcast_rs::{impl_downcast, Downcast},
-};
+use crate::{emit::BuiltInEmitters, MarkDoll, TagDiagnosticTranslation};
 
 /// block syntax tree
 pub type AST = Vec<BlockItem>;
 
 /// tag content, effectively just [`Any`](core::any::Any) with [`Debug`](core::fmt::Debug)
-pub trait TagContent: Downcast + core::fmt::Debug {}
+pub trait TagContent: ::downcast_rs::Downcast + ::core::fmt::Debug {}
 
-impl<T: Downcast + core::fmt::Debug> TagContent for T {}
+impl<T: ::downcast_rs::Downcast + ::core::fmt::Debug> TagContent for T {}
 
-impl_downcast!(TagContent);
+::downcast_rs::impl_downcast!(TagContent);
 
 /// an invoked tag
 #[derive(Debug)]

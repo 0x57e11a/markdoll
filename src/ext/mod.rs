@@ -11,8 +11,7 @@ pub mod table;
 
 use {
 	crate::{tree::TagContent, typemap::TypeMap, MarkDoll},
-	alloc::{boxed::Box, vec::Vec},
-	hashbrown::HashMap,
+	::hashbrown::HashMap,
 };
 
 /// the parsing signature tags use

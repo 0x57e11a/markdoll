@@ -1,5 +1,4 @@
 #![doc = include_str!("../README.md")]
-#![no_std]
 #![feature(downcast_unchecked)]
 #![warn(
 	clippy::pedantic,
@@ -25,8 +24,6 @@
 	reason = "tag names may share their module name, but it doesn't make sense to merge them"
 )]
 
-extern crate alloc;
-
 use {
 	crate::{
 		diagnostics::{Diagnostic, IndexedSrc, TagDiagnosticTranslation},
@@ -35,9 +32,7 @@ use {
 		tree::{parser, AST},
 		typemap::TypeMap,
 	},
-	::alloc::string::String,
-	alloc::vec::Vec,
-	hashbrown::HashMap,
+	::hashbrown::HashMap,
 };
 
 macro_rules! t {

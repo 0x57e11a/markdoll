@@ -3,17 +3,9 @@ use {
 		tree::{BlockItem, InlineItem, TagContent, TagInvocation, AST},
 		MarkDoll, TagDiagnosticTranslation,
 	},
-	alloc::{
-		boxed::Box,
-		rc::Rc,
-		string::{String, ToString},
-		vec::Vec,
-	},
-	log::error,
+	::log::error,
+	::std::rc::Rc,
 };
-
-#[rustfmt::skip] // doing this so rust-analyzer doesnt merge it into the above import, making it invalid. see https://github.com/rust-lang/rust-analyzer/issues/17317
-use alloc::vec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum IndentKind {

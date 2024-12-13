@@ -1,11 +1,4 @@
-use {
-	crate::{args, emit::HtmlEmit, ext::TagDefinition, tree::TagContent, MarkDoll},
-	::alloc::format,
-	alloc::{
-		boxed::Box,
-		string::{String, ToString},
-	},
-};
+use crate::{args, emit::HtmlEmit, ext::TagDefinition, tree::TagContent, MarkDoll};
 
 /// `code` tag
 ///

@@ -1,9 +1,6 @@
 #[cfg(feature = "ariadne")]
 use ariadne::{Label, Report, ReportKind};
-use {
-	alloc::{rc::Rc, vec::Vec},
-	core::cmp::Ordering,
-};
+use {::std::rc::Rc, core::cmp::Ordering};
 
 /// an issue in the source
 #[derive(Debug)]
