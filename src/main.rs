@@ -5,10 +5,12 @@ use {
 	::hashbrown::HashMap,
 	::markdoll::{
 		diagnostics,
-		emit::{BuiltInEmitters, HtmlEmit},
+		emit::{html::HtmlEmit, BuiltInEmitters},
 		ext, MarkDoll,
 	},
+	::miette::{miette, Diagnostic, LabeledSpan, Report, SourceCode},
 	::std::{io::Read, rc::Rc},
+	::tracing::{error_span, trace, trace_span},
 };
 
 #[derive(Parser, Debug)]
@@ -27,7 +29,15 @@ enum Command {
 }
 
 fn main() {
-	env_logger::init();
+	#[cfg(feature = "cli-trace")]
+	{
+		use ::tracing_subscriber::layer::SubscriberExt;
+
+		::tracing::subscriber::set_global_default(::tracing_subscriber::registry().with(
+			::tracing_fancytree::FancyTree::new(::std::io::stdout(), true),
+		))
+		.unwrap();
+	}
 
 	let args = Cli::parse();
 
@@ -38,59 +48,70 @@ fn main() {
 		.expect("failed to read stdin");
 
 	let mut doll = MarkDoll::new();
-	doll.ext_system.add_tags(ext::common::tags());
-	doll.ext_system.add_tags(ext::formatting::tags());
-	doll.ext_system.add_tags(ext::code::tags());
-	doll.ext_system.add_tags(ext::links::tags());
-	doll.ext_system.add_tags(ext::table::tags());
-	doll.set_emitters(BuiltInEmitters::<HtmlEmit>::default());
+	doll.add_tags(ext::common::tags());
+	doll.add_tags(ext::formatting::tags());
+	doll.add_tags(ext::code::tags());
+	doll.add_tags(ext::links::tags());
+	doll.add_tags(ext::table::tags());
+	doll.builtin_emitters.put(HtmlEmit::DEFAULT_EMITTERS);
 
-	log::info!("parse");
+	eprintln!("[parse] parsing...");
 
-	let mut ok = true;
+	let (mut ok, mut diagnostics, frontmatter, mut ast) =
+		doll.parse_document("stdin".to_string(), src);
 
-	match doll.parse_document(&src) {
-		Ok((_, mut ast)) => match args.command {
-			Command::Check => {
-				log::info!("parse succeeded")
+	if ok {
+		eprintln!("[parse] complete!");
+
+		if let Command::Convert = args.command {
+			let mut out = HtmlEmit {
+				write: String::new(),
+				section_level: 0,
+				code_block_format: Rc::new(|_, _, _, _| {}),
+			};
+
+			eprintln!("[emit] emitting...");
+
+			let (emit_ok, mut emit_diagnostics) = doll.emit(&mut ast, &mut out);
+			diagnostics.append(&mut emit_diagnostics);
+
+			if ok {
+				eprintln!("[emit] complete!");
+				eprintln!("[emit] writing output to stdout...");
+
+				print!("{}", out.write);
+
+				eprintln!("[emit] output written!");
+			} else {
+				eprintln!("[emit] failed");
+
+				ok = false;
 			}
-			Command::Convert => {
-				log::info!("emitting");
-
-				let mut out = HtmlEmit {
-					write: String::new(),
-					section_level: 0,
-					code_block_format: Rc::new(|_, _, _, _| {}),
-				};
-
-				if doll.emit(&mut ast, &mut out) {
-					log::info!("output written to stdout");
-
-					print!("{}", out.write);
-				} else {
-					log::error!("emit failed");
-					ok = false;
-				}
-			}
-		},
-		Err(_) => {
-			log::error!("parse failed");
-			ok = false;
 		}
+	} else {
+		eprintln!("[parse] failed");
 	}
 
-	log::info!("diagnostics");
+	eprintln!("diagnostics");
 
-	let mut cache = ariadne::Source::from(&src);
+	let source = doll.finish();
+	let mut reports = Vec::new();
 
-	for report in diagnostics::render(&doll.finish()) {
-		report.eprint(&mut cache).unwrap();
+	for diagnostic in diagnostics {
+		let traced = error_span!("diagnostic", ?diagnostic).entered();
+
+		let report = Report::from(diagnostic).with_source_code(source.clone());
+		reports.push(format!("{report:?}"));
+	}
+
+	for report in reports {
+		eprintln!("{report}");
 	}
 
 	if ok {
-		log::info!("end");
+		eprintln!("end");
 	} else {
-		log::error!("failed");
+		eprintln!("failed");
 		::std::process::exit(1);
 	}
 }

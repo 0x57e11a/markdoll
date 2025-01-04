@@ -1,71 +1,80 @@
-#[cfg(feature = "ariadne")]
-use ariadne::{Label, Report, ReportKind};
-use {::std::rc::Rc, core::cmp::Ordering};
+use {
+	crate::{
+		emit::EmitDiagnostic, ext::TagArgsDiagnostic, tree::parser::LangDiagnostic, MarkDollSrc,
+	},
+	::miette::Diagnostic,
+	::spanner::{Loc, Span, Spanner},
+	::std::sync::Mutex,
+	::tracing::{instrument, trace},
+};
 
-/// an issue in the source
-#[derive(Debug)]
-pub struct Diagnostic {
-	/// whether this diagnostic should indicate invalid state
-	pub err: bool,
-	/// the location of this diagnostic in the source
-	pub at: usize,
-	/// the content of this diagnostic
-	pub code: &'static str,
-	/// the location in the source of this diagnostic
-	///
-	/// this only exists in debug mode, so use [`doll.diag`](crate::MarkDoll::diag) or annotate things with `#[cfg(debug_assertions)]`
-	#[cfg(debug_assertions)]
-	#[allow(unused, reason = "conditional")]
-	pub src: &'static core::panic::Location<'static>,
+#[derive(::thiserror::Error, ::miette::Diagnostic, Debug)]
+pub enum DiagnosticKind {
+	#[error(transparent)]
+	#[diagnostic(transparent)]
+	Lang(
+		#[from]
+		#[diagnostic_source]
+		LangDiagnostic,
+	),
+	#[error(transparent)]
+	#[diagnostic(transparent)]
+	Emit(
+		#[from]
+		#[diagnostic_source]
+		EmitDiagnostic,
+	),
+	#[error(transparent)]
+	#[diagnostic(transparent)]
+	TagArgs(
+		#[from]
+		#[diagnostic_source]
+		TagArgsDiagnostic,
+	),
+	#[error(transparent)]
+	#[diagnostic(transparent)]
+	Tag(
+		#[from]
+		#[diagnostic_source]
+		Box<dyn Diagnostic + Send + Sync>,
+	),
 }
 
 #[derive(Debug)]
 pub(crate) struct TagDiagnosticTranslation {
-	pub src: Rc<str>,
-	pub indexed: Option<IndexedSrc>,
-	pub offset_in_parent: usize,
-	pub tag_pos_in_parent: usize,
-	pub indent: usize,
+	pub parent_span: Span,
+	pub span: Span,
+	pub lines_to_parent_line_starts: Mutex<Option<Vec<Loc>>>,
+	pub parent_indent: usize,
 }
 
-#[derive(Debug)]
-pub(crate) struct IndexedSrc {
-	lines: Vec<(usize, usize)>,
-	parent_lines: Vec<usize>,
-}
-
-impl IndexedSrc {
+impl TagDiagnosticTranslation {
 	#[must_use]
-	pub fn index(src: &str, parent: &str, offset_in_parent: usize, indent: usize) -> Self {
-		let lines = {
-			let mut lines = Vec::new();
+	#[instrument(skip(spanner), ret)]
+	pub fn to_parent(&self, spanner: &Spanner<MarkDollSrc>, span: Span) -> Span {
+		let parent = spanner.lookup_buf(self.parent_span.start());
+		let child = spanner.lookup_buf(self.span.start());
 
-			let mut start = 0;
-			for line in src.split('\n') {
-				let end = start + line.len() + 1;
-				lines.push((start, end - 1));
-				start = end;
-			}
+		trace!(parent_source = ?spanner.lookup_span(self.span), "source");
 
-			lines
-		};
-
-		let parent_chars = parent.chars().collect::<Vec<char>>();
-
-		let parent_lines = {
+		let mut lock = self.lines_to_parent_line_starts.lock().unwrap();
+		let translations = lock.get_or_insert_with(|| {
 			let mut parent_lines = Vec::new();
 
 			let mut start = 0;
-			for line in parent_chars[offset_in_parent.min(parent.len().saturating_sub(1))..]
+			for line in spanner
+				.lookup_span(self.parent_span)
+				.chars()
+				.collect::<Vec<_>>()
 				.split(|ch| *ch == '\n')
-				.take(lines.len())
+				.take(child.len_lines())
 			{
 				let end = start + line.len() + 1;
 
 				let mut ind = 0;
 
-				for _ in 0..indent {
-					match t!("char", line.get(ind)) {
+				for _ in 0..self.parent_indent {
+					match line.get(ind) {
 						Some('\t') => ind += 1,
 						Some('-' | '=') => ind += 2,
 						None => {}
@@ -75,79 +84,29 @@ impl IndexedSrc {
 
 				start += ind;
 
-				parent_lines.push(offset_in_parent + start);
+				parent_lines.push(self.parent_span.start() + start as u32);
 				start = end;
 			}
 
 			parent_lines
-		};
+		});
 
-		Self {
-			lines,
-			parent_lines,
-		}
+		let span_start_line = parent.line_col(self.parent_span.start());
+		let span_end_line = parent.line_col(self.parent_span.end());
+
+		trace!(?span_start_line, ?span_end_line);
+
+		Span::new(
+			{
+				let location = child.line_col(span.start());
+				trace!(?location, linestart = ?translations[location.line as usize], "start linecol");
+				translations[location.line as usize] + location.col as u32
+			},
+			{
+				let location = child.line_col(span.end());
+				trace!(?location, lineend = ?translations[location.line as usize], "end linecol");
+				translations[location.line as usize] + location.col as u32
+			},
+		)
 	}
-
-	#[must_use]
-	pub fn parent_offset(&self, index: usize) -> usize {
-		let mut offset_within_line = 0;
-		let mut last = 0;
-
-		t!("parent_offset index", index);
-
-		self.parent_lines[self
-			.lines
-			.binary_search_by(|(line_start, line_end)| {
-				if *line_end < index {
-					return Ordering::Less;
-				}
-
-				if *line_start > index {
-					return Ordering::Greater;
-				}
-
-				offset_within_line = index - line_start;
-				last = *line_end;
-
-				Ordering::Equal
-			})
-			.unwrap_or(last)]
-			+ offset_within_line
-	}
-}
-
-/// render [`Diagnostic`]s to ariadne [`Reports`](ariadne::Report)
-#[must_use]
-#[allow(
-	clippy::range_plus_one,
-	reason = "does not account for RangeInclusive not being accepted"
-)]
-#[cfg(feature = "ariadne")]
-pub fn render(diagnostics: &[Diagnostic]) -> Vec<Report<'static>> {
-	diagnostics
-		.iter()
-		.map(|diag| {
-			#[allow(unused_mut, reason = "conditional")]
-			let mut builder = Report::build(
-				if diag.err {
-					ReportKind::Error
-				} else {
-					ReportKind::Warning
-				},
-				(),
-				diag.at,
-			)
-			.with_message(diag.code)
-			.with_label(
-				Label::new(diag.at..diag.at + 1)
-					.with_color(ariadne::Color::Magenta)
-					.with_message(diag.code),
-			);
-
-			#[cfg(debug_assertions)]
-			builder.set_note(alloc::format!("originated from {}", diag.src));
-
-			builder.finish()
-		})
-		.collect()
 }

@@ -26,33 +26,19 @@
 
 use {
 	crate::{
-		diagnostics::{Diagnostic, IndexedSrc, TagDiagnosticTranslation},
+		diagnostics::{DiagnosticKind, TagDiagnosticTranslation},
 		emit::BuiltInEmitters,
-		ext::ExtensionSystem,
+		ext::{Emitters, TagDefinition},
 		tree::{parser, AST},
-		typemap::TypeMap,
 	},
+	::core::fmt::Debug,
 	::hashbrown::HashMap,
+	::miette::{Diagnostic, LabeledSpan, Severity, SourceSpan},
+	::spanner::{BufferSource, Span, Spanned, Spanner},
+	::std::sync::Arc,
+	::tracing::{instrument, Level},
 };
-
-macro_rules! t {
-	($text:expr, $expr:expr) => {
-		match $expr {
-			value => {
-				log::trace!("{}: {:#?}", $text, &value);
-				value
-			}
-		}
-	};
-	($text:literal) => {
-		log::trace!($text);
-	};
-	($expr:expr) => {
-		$crate::t!(stringify!($expr), $expr)
-	};
-}
-
-pub(crate) use t;
+pub use {::miette, ::spanner, ::thiserror};
 
 /// emitting/translating diagnostics
 pub mod diagnostics;
@@ -62,23 +48,50 @@ pub mod emit;
 pub mod ext;
 /// syntax trees and parser
 pub mod tree;
-/// storage by [`TypeId`](core::any::TypeId)
-pub mod typemap;
+
+#[derive(Debug)]
+pub enum SourceMetadata {
+	File(String),
+	LineTag(Span),
+	BlockTag(TagDiagnosticTranslation),
+	TagArgument(Span),
+}
+
+#[derive(Debug)]
+pub struct MarkDollSrc {
+	pub metadata: SourceMetadata,
+	pub source: String,
+}
+
+impl BufferSource for MarkDollSrc {
+	fn source(&self) -> &str {
+		&self.source
+	}
+
+	fn name(&self) -> Option<&str> {
+		Some(match &self.metadata {
+			SourceMetadata::File(filename) => filename,
+			SourceMetadata::LineTag(_) => "<line tag>",
+			SourceMetadata::BlockTag(_) => "<block tag>",
+			SourceMetadata::TagArgument(_) => "<tag argument>",
+		})
+	}
+}
 
 /// markdoll's main context
 #[derive(Debug)]
 pub struct MarkDoll {
-	/// the extension system, used to add tags
-	pub ext_system: ExtensionSystem,
+	/// the tags registered
+	pub tags: HashMap<&'static str, TagDefinition>,
 
-	pub(crate) builtin_emitters: TypeMap,
+	pub builtin_emitters: Emitters<BuiltInEmitters<()>>,
 
 	/// whether the current operation is "ok"
 	///
 	/// this shouldn't really be set to `true` by anything except the language
 	pub ok: bool,
-	pub(crate) diagnostics: Vec<Diagnostic>,
-	pub(crate) diagnostic_translations: Vec<TagDiagnosticTranslation>,
+	pub(crate) diagnostics: Vec<DiagnosticKind>,
+	pub spanner: Spanner<MarkDollSrc>,
 }
 
 impl MarkDoll {
@@ -86,157 +99,170 @@ impl MarkDoll {
 	#[must_use]
 	pub fn new() -> Self {
 		Self {
-			ext_system: ExtensionSystem {
-				tags: HashMap::new(),
-			},
+			tags: HashMap::new(),
 
-			builtin_emitters: TypeMap::default(),
+			builtin_emitters: Emitters::new(),
 
 			ok: true,
 			diagnostics: Vec::new(),
-			diagnostic_translations: Vec::new(),
+			spanner: Spanner::new(),
 		}
 	}
 
-	/// set [`BuiltInEmitters`] for an emit target [`To`]
-	pub fn set_emitters<To: 'static>(&mut self, emitters: BuiltInEmitters<To>) {
-		self.builtin_emitters.put(emitters);
+	/// add a tag
+	pub fn add_tag(&mut self, tag: TagDefinition) {
+		self.tags.insert(tag.key, tag);
 	}
 
-	/// parse the input into an AST
+	/// add multiple tags
+	pub fn add_tags<const N: usize>(&mut self, tags: [TagDefinition; N]) {
+		for tag in tags {
+			self.add_tag(tag);
+		}
+	}
+
+	/// parse the input into an AST, used to parse the content of tags in an existing parse operation
+	///
+	/// returns whether the fragment parsed successfully, and the produced [`AST`]
 	///
 	/// # errors
 	///
-	/// if any error diagnostics are emitted, the resulting [`AST`] may be incomplete
-	///
-	/// # note
-	///
-	/// ensure that the `finish` method is called to reset the state *before* parsing a new file
-	pub fn parse(&mut self, input: &str) -> Result<AST, AST> {
-		if self.diagnostic_translations.is_empty() {
-			self.diagnostic_translations.push(TagDiagnosticTranslation {
-				src: input.into(),
-				indexed: None,
-				offset_in_parent: 0,
-				tag_pos_in_parent: 0,
-				indent: 0,
-			});
-		}
-		let ok = self.ok;
+	/// if the operation does not succeed, the [`AST`] may be in an incomplete/incorrect state
+	#[instrument(level = Level::INFO)]
+	pub fn parse_embedded(&mut self, src: Span) -> (bool, AST) {
+		// stash state
+		let old_ok = ::core::mem::replace(&mut self.ok, true);
 
-		self.ok = true;
-		let res = parser::parse(parser::Ctx::new(self, input, false));
-		self.ok = ok;
+		// parse
+		let mut ctx = parser::Ctx::new(self, src);
+		let (ok, ast) = parser::parse(&mut ctx);
 
-		match res {
-			Ok((_, ast)) => Ok(ast),
-			Err((_, ast)) => Err(ast),
-		}
+		// restore stash
+		let _ = ::core::mem::replace(&mut self.ok, old_ok);
+
+		(ok, ast)
 	}
 
 	/// parse a complete document into an AST, including frontmatter
 	///
-	/// # errors
-	///
-	/// if any error diagnostics are emitted, the resulting [`AST`] may be incomplete
-	///
-	/// # note
-	///
-	/// ensure that the `finish` method is called to reset the state *before* parsing a new file
+	/// returns
+	/// - whether the operation was successful
+	/// - the diagnostics produced during the operation (may not be ampty on success)
+	/// - the frontmatter
+	/// - the [AST]
+	#[instrument(level = Level::INFO, ret)]
 	pub fn parse_document(
 		&mut self,
-		input: &str,
-	) -> Result<(Option<String>, AST), (Option<String>, AST)> {
-		if self.diagnostic_translations.is_empty() {
-			self.diagnostic_translations.push(TagDiagnosticTranslation {
-				src: input.into(),
-				indexed: None,
-				offset_in_parent: 0,
-				tag_pos_in_parent: 0,
-				indent: 0,
-			});
-		}
-		let ok = self.ok;
+		filename: String,
+		source: String,
+	) -> (bool, Vec<DiagnosticKind>, Option<String>, AST) {
+		// stash state
+		let old_ok = ::core::mem::replace(&mut self.ok, true);
+		let old_diagnostics = ::core::mem::replace(&mut self.diagnostics, Vec::new());
 
-		self.ok = true;
-		let res = parser::parse(parser::Ctx::new(self, input, true));
-		self.ok = ok;
+		// parse
+		let buf = self.spanner.add(|_| MarkDollSrc {
+			metadata: SourceMetadata::File(filename),
+			source,
+		});
+		let mut ctx = parser::Ctx::new(self, buf.span());
+		let frontmatter = parser::frontmatter(&mut ctx);
+		let (ok, ast) = parser::parse(&mut ctx);
 
-		res
+		// restore stash
+		let _ = ::core::mem::replace(&mut self.ok, old_ok);
+		let diagnostics = ::core::mem::replace(&mut self.diagnostics, old_diagnostics);
+
+		(ok, diagnostics, frontmatter, ast)
 	}
 
-	/// emit the given [`AST`] to an output, returning true if it was successful
+	/// emit the given [`AST`] to an output
 	///
-	/// # note
-	///
-	/// ensure that the `finish` method is called to reset the state *before* parsing a new file
-	pub fn emit<To: 'static>(&mut self, ast: &mut AST, to: &mut To) -> bool {
-		let ok = self.ok;
+	/// returns
+	/// - whether the operation was successful
+	/// - the diagnostics produced during the operation (may not be ampty on success)
+	#[instrument(level = Level::INFO)]
+	pub fn emit<To: Debug + 'static>(
+		&mut self,
+		ast: &mut AST,
+		to: &mut To,
+	) -> (bool, Vec<DiagnosticKind>) {
+		// stash state
+		let old_ok = ::core::mem::replace(&mut self.ok, true);
+		let old_diagnostics = ::core::mem::replace(&mut self.diagnostics, Vec::new());
 
-		self.ok = true;
-		for node in ast {
+		// emit
+		for Spanned(_, node) in ast {
 			node.emit(self, to, true);
 		}
-		self.ok = ok;
 
-		self.ok
+		// restore stash
+		let _ = ::core::mem::replace(&mut self.ok, old_ok);
+		let diagnostics = ::core::mem::replace(&mut self.diagnostics, old_diagnostics);
+
+		(self.ok, diagnostics)
 	}
 
-	/// ensure that this method is called after parsing a source file, otherwise diagnostics may malfunction
-	pub fn finish(&mut self) -> Vec<Diagnostic> {
-		self.ok = true;
-		self.diagnostic_translations.clear();
-		core::mem::take(&mut self.diagnostics)
+	/// finish a set of files and prepare to render diagnostics
+	///
+	/// returns the shared spanner to use with [Report::with_source_code](::miette::Report::with_source_code)
+	pub fn finish(&mut self) -> Arc<Spanner<MarkDollSrc>> {
+		Arc::new(::core::mem::take(&mut self.spanner))
 	}
 
 	/// emit a diagnostic, mapping the position accordingly
-	///
-	/// pass [`usize::MAX`] to `at` to emit at the tag currently containing this context
 	#[track_caller]
-	pub fn diag(&mut self, err: bool, mut at: usize, code: &'static str) {
-		if err {
+	#[instrument(level = Level::ERROR)]
+	pub fn diag(&mut self, diagnostic: DiagnosticKind) {
+		if let None | Some(Severity::Error) = diagnostic.severity() {
 			self.ok = false;
 		}
 
-		t!("---- begin diag ----");
-		t!(at);
-		t!(&self.diagnostic_translations);
+		::tracing::info!(origin = %::core::panic::Location::caller(), "rust origin");
 
-		let mut i = self.diagnostic_translations.len() - 1;
-		while i > 0 {
-			let [parent, trans] = &mut self.diagnostic_translations[i - 1..=i] else {
-				unreachable!()
-			};
+		self.diagnostics.push(diagnostic);
+	}
 
-			at = if at == usize::MAX {
-				trans.tag_pos_in_parent
-			} else if let Some(indexed) = &trans.indexed {
-				t!(
-					"indexed parent offset (prev indexed)",
-					indexed.parent_offset(at)
-				)
-			} else {
-				let indexed = IndexedSrc::index(
-					&trans.src,
-					&parent.src,
-					trans.offset_in_parent,
-					trans.indent,
-				);
-				let index = t!("indexed parent offset", indexed.parent_offset(at));
-				trans.indexed = Some(indexed);
-				index
-			};
+	/// returns (outer, inner) span
+	#[instrument(skip(self), ret)]
+	pub fn resolve_span(&mut self, mut span: Span) -> (SourceSpan, Vec<LabeledSpan>) {
+		let mut init = span;
+		let mut labels = Vec::new();
 
-			i -= 1;
+		loop {
+			let file = &self.spanner.lookup_buf(span.start());
+			span = match &file.src.metadata {
+				SourceMetadata::File(_) => break,
+				SourceMetadata::TagArgument(new) | SourceMetadata::LineTag(new) => {
+					labels.push(LabeledSpan::new_with_span(
+						Some("⇣ originates from".to_string()),
+						self.spanner.lookup_linear_index(new.start())
+							..self.spanner.lookup_linear_index(new.end()),
+					));
+					*new
+				}
+				SourceMetadata::BlockTag(trans) => {
+					let parent = trans.to_parent(&self.spanner, span);
+					if let Some(label) = labels.pop() {
+						labels.push(LabeledSpan::new_with_span(
+							label.label().map(ToString::to_string),
+							self.spanner.lookup_linear_index(parent.start())
+								..self.spanner.lookup_linear_index(parent.end()),
+						));
+					} else {
+						init = parent
+					}
+					parent
+				}
+			}
 		}
 
-		self.diagnostics.push(Diagnostic {
-			err,
-			at,
-			code,
-			#[cfg(debug_assertions)]
-			src: core::panic::Location::caller(),
-		});
+		(
+			(self.spanner.lookup_linear_index(init.start())
+				..self.spanner.lookup_linear_index(init.end()))
+				.into(),
+			labels,
+		)
 	}
 }
 

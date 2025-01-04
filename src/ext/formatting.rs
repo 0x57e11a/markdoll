@@ -1,9 +1,12 @@
-use crate::{
-	args,
-	emit::HtmlEmit,
-	ext::TagDefinition,
-	tree::{TagContent, AST},
-	MarkDoll,
+use {
+	crate::{
+		args,
+		emit::html::HtmlEmit,
+		ext::{Emitters, TagDefinition, TagEmitter},
+		tree::{TagContent, AST},
+		MarkDoll,
+	},
+	::spanner::{Span, Spanned},
 };
 
 /// `em` tag
@@ -57,11 +60,12 @@ pub mod emphasis {
 	/// the tag
 	#[must_use]
 	pub fn tag() -> TagDefinition {
-		TagDefinition::new(
-			"em",
-			Some(|doll, mut args, text| {
+		TagDefinition {
+			key: "em",
+			parse: |mut doll, args, text, tag_span| {
 				args! {
-					doll, args;
+					args;
+					doll, tag_span;
 
 					args();
 					opt_args();
@@ -76,21 +80,24 @@ pub mod emphasis {
 					strikethrough: s,
 					highlight: h,
 					quote: q,
-					ast: match doll.parse(text) {
-						Ok(ast) => ast,
-						Err(ast) => {
-							doll.ok = false;
-							ast
-						}
+					ast: {
+						let (ok, ast) = doll.parse_embedded(text.into());
+						doll.ok &= ok;
+						ast
 					},
 				}))
-			}),
-		)
-		.with_emitter::<HtmlEmit>(html)
+			},
+			emitters: Emitters::<TagEmitter>::new().with(html),
+		}
 	}
 
 	/// emit to html
-	pub fn html(doll: &mut MarkDoll, to: &mut HtmlEmit, content: &mut Box<dyn TagContent>) {
+	pub fn html(
+		doll: &mut MarkDoll,
+		to: &mut HtmlEmit,
+		content: &mut Box<dyn TagContent>,
+		_: Span,
+	) {
 		let em = content.downcast_mut::<Emphasis>().unwrap();
 
 		if em.italic {
@@ -118,7 +125,7 @@ pub mod emphasis {
 		}
 
 		let inline_block = em.ast.len() > 1;
-		for item in &mut em.ast {
+		for Spanned(_, item) in &mut em.ast {
 			item.emit(doll, to, inline_block);
 		}
 
@@ -173,11 +180,12 @@ pub mod quote {
 	/// the tag
 	#[must_use]
 	pub fn tag() -> TagDefinition {
-		TagDefinition::new(
-			"quote",
-			Some(|doll, mut args, text| {
+		TagDefinition {
+			key: "quote",
+			parse: |mut doll, args, text, tag_span| {
 				args! {
-					doll, args;
+					args;
+					doll, tag_span;
 
 					args();
 					opt_args(cite: String);
@@ -187,21 +195,24 @@ pub mod quote {
 
 				Some(Box::new(Quote {
 					cite,
-					ast: match doll.parse(text) {
-						Ok(ast) => ast,
-						Err(ast) => {
-							doll.ok = false;
-							ast
-						}
+					ast: {
+						let (ok, ast) = doll.parse_embedded(text.into());
+						doll.ok &= ok;
+						ast
 					},
 				}))
-			}),
-		)
-		.with_emitter::<HtmlEmit>(html)
+			},
+			emitters: Emitters::<TagEmitter>::new().with(html),
+		}
 	}
 
 	/// emit to html
-	pub fn html(doll: &mut MarkDoll, to: &mut HtmlEmit, content: &mut Box<dyn TagContent>) {
+	pub fn html(
+		doll: &mut MarkDoll,
+		to: &mut HtmlEmit,
+		content: &mut Box<dyn TagContent>,
+		_: Span,
+	) {
 		let quote = content.downcast_mut::<Quote>().unwrap();
 
 		to.write.push_str("<figure class='doll-quote'>");
@@ -216,7 +227,7 @@ pub mod quote {
 		to.write.push_str("<blockquote>");
 
 		let inline_block = quote.ast.len() > 1;
-		for item in &mut quote.ast {
+		for Spanned(_, item) in &mut quote.ast {
 			item.emit(doll, to, inline_block);
 		}
 

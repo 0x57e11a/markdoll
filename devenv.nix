@@ -7,8 +7,8 @@
 	enterTest = ''
 		rm spec.html
 		echo DEBUG
-		cargo test -F ariadne
+		cat spec.doll | cargo run -F cli convert > spec.html
 		echo RELEASE
-		cargo test -F ariadne --release
+		cat spec.doll | cargo run -F cli --release convert > spec.html
 	'';
 }

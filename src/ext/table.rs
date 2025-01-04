@@ -1,10 +1,35 @@
-use crate::{
-	args,
-	emit::HtmlEmit,
-	ext::TagDefinition,
-	tree::{BlockItem, InlineItem, TagContent, TagInvocation, AST},
-	MarkDoll,
+use {
+	crate::{
+		args,
+		diagnostics::DiagnosticKind,
+		emit::html::HtmlEmit,
+		ext::{Emitters, TagDefinition, TagEmitter},
+		tree::{BlockItem, InlineItem, TagContent, TagInvocation, AST},
+		MarkDoll,
+	},
+	::miette::{LabeledSpan, SourceSpan},
+	::spanner::{Span, Spanned},
 };
+
+#[derive(Debug, ::thiserror::Error, ::miette::Diagnostic)]
+pub enum TableDiagnostic {
+	#[error("tables may only contain lists and `tr` tags")]
+	#[diagnostic(code(markdoll::ext::table::non_row))]
+	NonRow {
+		#[label]
+		at: SourceSpan,
+		#[label(collection)]
+		context: Vec<LabeledSpan>,
+	},
+	#[error("table rows may only contain lists and `tc` tags")]
+	#[diagnostic(code(markdoll::ext::table::non_cell))]
+	NonCell {
+		#[label]
+		at: SourceSpan,
+		#[label(collection)]
+		context: Vec<LabeledSpan>,
+	},
+}
 
 /// a table cell
 #[derive(Debug)]
@@ -16,7 +41,7 @@ pub struct Cell {
 	/// how many columns to span
 	pub cols: usize,
 	/// content
-	pub content: AST,
+	pub ast: AST,
 }
 
 /// a table row
@@ -39,25 +64,29 @@ pub struct Table {
 
 fn parse_row(doll: &mut MarkDoll, ast: AST) -> Vec<Cell> {
 	#[track_caller]
-	fn fail(doll: &mut MarkDoll, pos: usize) {
-		doll.diag(true, pos, "tr tags may only contain lists and `tc` tags");
+	fn fail(doll: &mut MarkDoll, span: Span) {
+		let (at, context) = doll.resolve_span(span);
+		doll.diag(DiagnosticKind::Tag(Box::new(TableDiagnostic::NonCell {
+			at,
+			context,
+		})));
 	}
 
 	let mut cells = Vec::new();
 
-	for child in ast {
+	for Spanned(span, child) in ast {
 		match child {
 			BlockItem::Inline(items) => {
-				for (pos, item) in items {
+				for Spanned(span, item) in items {
 					match item {
 						InlineItem::Tag(TagInvocation { content, .. }) => {
 							if let Ok(cell) = content.downcast::<Cell>() {
 								cells.push(*cell);
 							} else {
-								fail(doll, pos);
+								fail(doll, span);
 							}
 						}
-						_ => fail(doll, pos),
+						_ => fail(doll, span),
 					}
 				}
 			}
@@ -67,11 +96,11 @@ fn parse_row(doll: &mut MarkDoll, ast: AST) -> Vec<Cell> {
 						is_head: ordered,
 						rows: 1,
 						cols: 1,
-						content: item,
+						ast: item,
 					});
 				}
 			}
-			BlockItem::Section { pos, .. } => fail(doll, pos),
+			BlockItem::Section { .. } => fail(doll, span),
 		}
 	}
 
@@ -94,35 +123,35 @@ pub mod table {
 	/// the tag
 	#[must_use]
 	pub fn tag() -> TagDefinition {
-		TagDefinition::new(
-			"table",
-			Some(|doll, _, text| {
-				#[track_caller]
-				fn fail(doll: &mut MarkDoll, pos: usize) {
-					doll.diag(
-						true,
-						pos,
-						"`table` tags may only contain lists and `tr` tags",
-					);
+		TagDefinition {
+			key: "table",
+			parse: |mut doll, args, text, tag_span| {
+				args! {
+					args;
+					doll, tag_span;
 				}
 
-				let ast = match doll.parse(text) {
-					Ok(ast) => ast,
-					Err(ast) => {
-						doll.ok = false;
-						ast
-					}
-				};
+				#[track_caller]
+				fn fail(doll: &mut MarkDoll, span: Span) {
+					let (at, context) = doll.resolve_span(span);
+					doll.diag(DiagnosticKind::Tag(Box::new(TableDiagnostic::NonRow {
+						at,
+						context,
+					})));
+				}
+
+				let (ok, ast) = doll.parse_embedded(text.into());
+				doll.ok &= ok;
 
 				let mut table = Table {
 					head: Vec::new(),
 					body: Vec::new(),
 				};
 
-				for child in ast {
+				for Spanned(span, child) in ast {
 					match child {
 						BlockItem::Inline(items) => {
-							for (pos, item) in items {
+							for Spanned(span, item) in items {
 								match item {
 									InlineItem::Tag(TagInvocation { content, .. }) => {
 										if let Ok(row) = content.downcast::<Row>() {
@@ -132,10 +161,10 @@ pub mod table {
 												table.body.push(*row);
 											}
 										} else {
-											fail(doll, pos);
+											fail(doll, span);
 										}
 									}
-									_ => fail(doll, pos),
+									_ => fail(doll, span),
 								}
 							}
 						}
@@ -153,18 +182,23 @@ pub mod table {
 								}
 							}
 						}
-						BlockItem::Section { pos, .. } => fail(doll, pos),
+						BlockItem::Section { .. } => fail(doll, span),
 					}
 				}
 
 				Some(Box::new(table))
-			}),
-		)
-		.with_emitter::<HtmlEmit>(html)
+			},
+			emitters: Emitters::<TagEmitter>::new().with(html),
+		}
 	}
 
 	/// emit to html
-	pub fn html(doll: &mut MarkDoll, to: &mut HtmlEmit, content: &mut Box<dyn TagContent>) {
+	pub fn html(
+		doll: &mut MarkDoll,
+		to: &mut HtmlEmit,
+		content: &mut Box<dyn TagContent>,
+		_: Span,
+	) {
 		fn write_cell(doll: &mut MarkDoll, to: &mut HtmlEmit, cell: &mut Cell) {
 			let kind = if cell.is_head { "th" } else { "td" };
 			to.write.push_str(&format!("<{kind}"));
@@ -178,8 +212,8 @@ pub mod table {
 
 			to.write.push('>');
 
-			let inline_block = cell.content.len() > 1;
-			for content in &mut cell.content {
+			let inline_block = cell.ast.len() > 1;
+			for Spanned(_, content) in &mut cell.ast {
 				content.emit(doll, to, inline_block);
 			}
 
@@ -251,33 +285,29 @@ pub mod tr {
 	/// the tag
 	#[must_use]
 	pub fn tag() -> TagDefinition {
-		TagDefinition::new(
-			"tr",
-			Some(|doll, mut args, text| {
+		TagDefinition {
+			key: "tr",
+			parse: |mut doll, args, text, tag_span| {
 				args! {
-					doll, args;
+					args;
+					doll, tag_span;
 
-					args();
-					opt_args();
 					flags(head);
-					props();
 				}
+
+				let ast = {
+					let (ok, ast) = doll.parse_embedded(text.into());
+					doll.ok &= ok;
+					ast
+				};
 
 				Some(Box::new(Row {
 					is_head: head,
-					cells: {
-						let ast = match doll.parse(text) {
-							Ok(ast) => ast,
-							Err(ast) => {
-								doll.ok = false;
-								ast
-							}
-						};
-						parse_row(doll, ast)
-					},
+					cells: parse_row(doll, ast),
 				}))
-			}),
-		)
+			},
+			emitters: Emitters::<TagEmitter>::new(),
+		}
 	}
 }
 
@@ -310,11 +340,12 @@ pub mod tc {
 	/// the tag
 	#[must_use]
 	pub fn tag() -> TagDefinition {
-		TagDefinition::new(
-			"tc",
-			Some(|doll, mut args, text| {
+		TagDefinition {
+			key: "tc",
+			parse: |mut doll, args, text, tag_span| {
 				args! {
-					doll, args;
+					args;
+					doll, tag_span;
 
 					args();
 					opt_args();
@@ -326,16 +357,15 @@ pub mod tc {
 					is_head: head,
 					rows: rows.unwrap_or(1),
 					cols: cols.unwrap_or(1),
-					content: match doll.parse(text) {
-						Ok(ast) => ast,
-						Err(ast) => {
-							doll.ok = false;
-							ast
-						}
+					ast: {
+						let (ok, ast) = doll.parse_embedded(text.into());
+						doll.ok &= ok;
+						ast
 					},
 				}))
-			}),
-		)
+			},
+			emitters: Emitters::<TagEmitter>::new(),
+		}
 	}
 }
 

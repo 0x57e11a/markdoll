@@ -9,16 +9,25 @@ pub mod links;
 /// `table`/`tr`/`tc` tags
 pub mod table;
 
+pub use emitters::Emitters;
 use {
-	crate::{tree::TagContent, typemap::TypeMap, MarkDoll},
-	::hashbrown::HashMap,
+	crate::{tree::TagContent, MarkDoll, MarkDollSrc},
+	::miette::{LabeledSpan, SourceSpan},
+	::spanner::{Span, SrcSpan},
 };
 
+mod emitters;
+
 /// the parsing signature tags use
-pub type TagParser =
-	fn(doll: &mut MarkDoll, args: Vec<&str>, text: &str) -> Option<Box<dyn TagContent>>;
+pub type TagParser = fn(
+	doll: &mut MarkDoll,
+	args: Vec<SrcSpan<MarkDollSrc>>,
+	text: SrcSpan<MarkDollSrc>,
+	tag_span: Span,
+) -> Option<Box<dyn TagContent>>;
 /// the emitting signature tags use for a given `To`
-pub type TagEmitter<To> = fn(doll: &mut MarkDoll, to: &mut To, content: &mut Box<dyn TagContent>);
+pub type TagEmitter<To = ()> =
+	fn(doll: &mut MarkDoll, to: &mut To, content: &mut Box<dyn TagContent>, tag_span: Span);
 
 /// defines a tag name, how to parse its contents, and how to emit it
 #[derive(Debug, Clone)]
@@ -31,55 +40,18 @@ pub struct TagDefinition {
 	pub key: &'static str,
 
 	/// parse the tag contents
-	///
-	/// return None to avoid being placed into the AST and emitting
-	pub parse: Option<TagParser>,
+	pub parse: TagParser,
 
 	/// emit the tag content
-	emitters: TypeMap,
-}
-
-impl TagDefinition {
-	/// create a new tag definition
-	#[must_use]
-	pub fn new(key: &'static str, parse: Option<TagParser>) -> TagDefinition {
-		Self {
-			key,
-			parse,
-			emitters: TypeMap::default(),
-		}
-	}
-
-	/// set the emitter on this tag for an emit target
-	pub fn set_emitter<To: 'static>(&mut self, emitter: TagEmitter<To>) {
-		self.emitters.put(emitter);
-	}
-
-	/// set the emitter on this tag for an emit target, and return self for chaining
-	#[must_use]
-	pub fn with_emitter<To: 'static>(mut self, emitter: TagEmitter<To>) -> Self {
-		self.set_emitter(emitter);
-		self
-	}
-
-	/// retrieve the emitter on this tag for an emit target
-	#[must_use]
-	pub fn emitter_for<To: 'static>(&self) -> Option<TagEmitter<To>> {
-		self.emitters.get_ref().copied()
-	}
-
-	/// whether this tag has any emitters
-	#[must_use]
-	pub fn has_any_emitters(&self) -> bool {
-		!self.emitters.is_empty()
-	}
+	pub emitters: Emitters<TagEmitter>,
 }
 
 /// helper macro to parse arguments into variables
 ///
 /// ```rs
 /// args! {
-///     doll, args; // pass in the markdoll and args
+///     args; // pass the args
+/// 	doll, tag_span; // pass in the markdoll and args
 ///
 ///     args(arg1, arg2: usize); // parse required arguments, which may be parsed into another type, if applicable. ex: `(2)`
 ///     opt_args(oarg1, oarg2: usize); // parse optional arguments, which will be `Some` when present (and parsed into another type, if applicable), or `None` if not. ex: `(2)`
@@ -90,152 +62,228 @@ impl TagDefinition {
 #[macro_export]
 macro_rules! args {
 	{
-		$doll:ident, $args:ident;
+		$args:ident;
+		$doll:ident, $tag_span:ident;
 
-		args($($arg:ident$(: $arg_ty:ty)?),*);
-		opt_args($($opt_arg:ident$(: $opt_arg_ty:ty)?),*);
-		flags($($flag:ident),*);
-		props($($prop:ident$(: $prop_ty:ty)?),*);
+		$(args($($arg:ident$(: $arg_ty:ty)?),*);)?
+		$(opt_args($($opt_arg:ident$(: $opt_arg_ty:ty)?),*);)?
+		$(flags($($flag:ident),*);)?
+		$(props($($prop:ident$(: $prop_ty:ty)?),*);)?
 	} => {
-		let _ = (&$doll, &$args);
-
-		$(
-			#[allow(unused, reason = "macro")]
-			let mut $arg = if !$args.is_empty() {
-				args! {
-					if [$($arg_ty)?] {
-						#[allow(irrefutable_let_patterns, reason = "macro")]
-						if let Ok(value) = $args.remove(0).parse::<$($arg_ty)?>() {
-							value
-						} else {
-							$doll.diag(true, usize::MAX, concat!("arg ", stringify!($arg), " invalid"));
-
-							return None;
-						}
-					} else {
-						$args.remove(0)
-					}
-				}
-			} else {
-				$doll.diag(true, usize::MAX, concat!("argument ", stringify!(person), " required"));
-
-				return None;
-			};
-		)*
-
-		$(
-			#[allow(unused, reason = "macro")]
-			let mut $opt_arg = if !$args.is_empty() {
-				Some(args! {
-					if [$($opt_arg_ty)?] {
-						#[allow(irrefutable_let_patterns, reason = "macro")]
-						if let Ok(value) = $args.remove(0).parse::<$($opt_arg_ty)?>() {
-							value
-						} else {
-							$doll.diag(true, usize::MAX, concat!("arg ", stringify!($opt_arg), " invalid"));
-
-							return None;
-						}
-					} else {
-						$args.remove(0)
-					}
-				})
-			} else {
-				None
-			};
-		)*
-
-		$(let mut $flag = false;)*
-
-		$(
-			let mut $prop;
-
-			args! {
-				if [$($prop_ty)?] {
-					$prop = Option::<$($prop_ty)?>::None;
-				} else {
-					$prop = Option::<&str>::None;
-				}
-			}
-		)*
+		#[allow(unused, reason = "macro")]
+		let (mut doll, mut args) = (&mut $doll, $args);
 
 		args! {
-			if [$($flag)* $($prop)*] {
-				#[allow(unused, reason = "macro")]
-				let mut retain_ok = true;
+			&mut args;
+			doll, $tag_span;
 
-				$args.retain(|arg| match *arg {
-					$(
-						stringify!($flag) => {
-							$flag = true;
-							false
-						}
-					)*
-					#[allow(unused, reason = "macro")]
-					input => args! {
-						if [$($prop)*] {
-							// parse properties
-							if let Some(index) = input.find("=") {
-								match &input[..index] {
-									$(
-										stringify!($prop) => {
-											args! {
-												if [$($prop_ty)?] {
-													if let Ok(value) = input[(index + 1)..].parse::<$($prop_ty)?>() {
-														$prop = Some(value);
-													} else {
-														$doll.diag(true, usize::MAX, concat!("prop ", stringify!(person), " invalid"));
+			$(args($($arg$(: $arg_ty)?),*);)?
+			$(opt_args($($opt_arg$(: $opt_arg_ty)?),*);)?
+			$(flags($($flag),*);)?
+			$(props($($prop$(: $prop_ty)?),*);)?
+		}
 
-														retain_ok = false;
-													}
-												} else {
-													$prop = Some(&input[(index + 1)..]);
-												}
-											};
-											false
-										}
-									)*
-									_ => true,
-								}
-							} else {
-								true
-							}
-						} else {
-							// no properties
-							true
-						}
-					},
-				});
-
-				if !retain_ok {
-					return None;
-				}
-			} else {}
-		};
+		for arg in args {
+			let (at, context) = doll.resolve_span(arg.into());
+			doll.diag($crate::ext::TagArgsDiagnostic::Unused {
+				at,
+				context,
+			}.into());
+		}
 	};
 
-	{ if [] $true:tt else $false:tt } => { $false };
-	{ if [$($tok:ident)+] $true:tt else $false:tt } => { $true };
-	{ if [$($tok:ty)+] $true:tt else $false:tt } => { $true };
-}
+	{
+		&mut $args:ident;
+		$doll:ident, $tag_span:ident;
 
-/// handles tag definitions
-#[derive(Debug)]
-pub struct ExtensionSystem {
-	/// the tags registered
-	pub tags: HashMap<&'static str, TagDefinition>,
-}
+		$(args($($arg:ident$(: $arg_ty:ty)?),*);)?
+		$(opt_args($($opt_arg:ident$(: $opt_arg_ty:ty)?),*);)?
+		$(flags($($flag:ident),*);)?
+		$(props($($prop:ident$(: $prop_ty:ty)?),*);)?
+	} => {
+		$($(let $arg;)*)?
+		$($(let $opt_arg;)*)?
+		$($(let mut $flag = false;)*)?
+		$($(let mut $prop = args! {
+			@if [$($prop_ty)?] {
+				Option::<$($prop_ty)?>::None
+			} else {
+				Option::<$crate::spanner::SrcSpan<$crate::MarkDollSrc>>::None
+			}
+		};)*)?
 
-impl ExtensionSystem {
-	/// add a tag
-	pub fn add_tag(&mut self, tag: TagDefinition) {
-		self.tags.insert(tag.key, tag);
-	}
+		#[allow(unused, reason = "macro")]
+		{
+			let (doll, args, tag_span, mut arg_i) = (&mut $doll, &mut $args, &$tag_span, 0);
 
-	/// add multiple tags
-	pub fn add_tags<const N: usize>(&mut self, tags: [TagDefinition; N]) {
-		for tag in tags {
-			self.add_tag(tag);
+			$($(
+				arg_i += 1;
+				$arg = if !args.is_empty() {
+					args! {
+						@if [$($arg_ty)?] {
+							let span = args.remove(0);
+							#[allow(irrefutable_let_patterns, reason = "macro")]
+							if let Ok(value) = span.parse::<$($arg_ty)?>() {
+								value
+							} else {
+								let (at, context) = doll.resolve_span(span.into());
+								doll.diag($crate::ext::TagArgsDiagnostic::InvalidArgument {
+									num: arg_i,
+									name: stringify!($arg),
+									at,
+									context,
+								}.into());
+
+								return None;
+							}
+						} else {
+							args.remove(0)
+						}
+					}
+				} else {
+					let (at, context) = doll.resolve_span(*tag_span);
+					doll.diag($crate::ext::TagArgsDiagnostic::MissingArgument {
+						num: arg_i,
+						name: stringify!($arg),
+						at,
+						context,
+					}.into());
+
+					return None;
+				};
+			)*)?
+
+			$($(
+				arg_i += 1;
+				$opt_arg = if !args.is_empty() {
+					Some(args! {
+						@if [$($opt_arg_ty)?] {
+							let span = args.remove(0);
+							#[allow(irrefutable_let_patterns, reason = "macro")]
+							if let Ok(value) = span.parse::<$($opt_arg_ty)?>() {
+								value
+							} else {
+								let (at, context) = doll.resolve_span(span.into());
+								doll.diag($crate::ext::TagArgsDiagnostic::InvalidArgument {
+									num: arg_i,
+									name: stringify!($opt_arg),
+									at,
+									context,
+								}.into());
+
+								return None;
+							}
+						} else {
+							args.remove(0)
+						}
+					})
+				} else {
+					None
+				};
+			)*)?
+
+			args! {
+				@if [$($($flag)*)? $($($prop)*)?] {
+					let mut retain_ok = true;
+
+					args.retain(|arg| match &**arg {
+						$($(
+							stringify!($flag) => {
+								$flag = true;
+								false
+							}
+						)*)?
+						input => args! {
+							@if [$($($prop)*)?] {
+								// parse properties
+								if let Some(index) = input.find("=") {
+									match &input[..index] {
+										$($(
+											stringify!($prop) => {
+												let span = arg.subspan((index as u32 + 1)..);
+												args! {
+													@if [$($prop_ty)?] {
+														if let Ok(value) = span.parse::<$($prop_ty)?>() {
+															$prop = Some(value);
+														} else {
+															let (at, context) = doll.resolve_span(span.into());
+															doll.diag($crate::ext::TagArgsDiagnostic::InvalidProperty {
+																name: stringify!($prop),
+																at,
+																context,
+															}.into());
+
+															retain_ok = false;
+														}
+													} else {
+														$prop = Some(span);
+													}
+												};
+												false
+											}
+										)*)?
+										_ => true,
+									}
+								} else {
+									true
+								}
+							} else {
+								// no properties
+								true
+							}
+						},
+					});
+
+					if !retain_ok {
+						return None;
+					}
+				} else {}
+			};
 		}
-	}
+	};
+
+	{ @if [] $true:tt else $false:tt } => { $false };
+	{ @if [$($tok:ident)+] $true:tt else $false:tt } => { $true };
+	{ @if [$($tok:ty)+] $true:tt else $false:tt } => { $true };
+}
+
+#[derive(Debug, ::thiserror::Error, ::miette::Diagnostic)]
+pub enum TagArgsDiagnostic {
+	#[error("missing argument #{num} `{name}`")]
+	#[diagnostic(code(markdoll::tag::missing_arg))]
+	MissingArgument {
+		num: usize,
+		name: &'static str,
+		#[label]
+		at: SourceSpan,
+		#[label(collection)]
+		context: Vec<LabeledSpan>,
+	},
+	#[error("invalid argument #{num} `{name}`")]
+	#[diagnostic(code(markdoll::tag::invalid_arg))]
+	InvalidArgument {
+		num: usize,
+		name: &'static str,
+		#[label("failed to parse")]
+		at: SourceSpan,
+		#[label(collection)]
+		context: Vec<LabeledSpan>,
+	},
+	#[error("invalid property `{name}`")]
+	#[diagnostic(code(markdoll::tag::invalid_prop))]
+	InvalidProperty {
+		name: &'static str,
+		#[label("failed to parse")]
+		at: SourceSpan,
+		#[label(collection)]
+		context: Vec<LabeledSpan>,
+	},
+	#[error("unused input")]
+	#[diagnostic(code(markdoll::tag::unused_input), severity(Warning))]
+	Unused {
+		#[label("this is ignored")]
+		at: SourceSpan,
+		#[label(collection)]
+		context: Vec<LabeledSpan>,
+	},
 }

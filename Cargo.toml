@@ -12,23 +12,24 @@ keywords = ["markup"]
 categories = ["compilers", "no-std", "parser-implementations", "visualization"]
 
 [dependencies]
-hashbrown = "0.14.5"
 html-escape = "0.2.13"
 downcast-rs = "1.2.1"
-log = "0.4.22"
-env_logger = "0.11.5"
-ariadne = { version = "0.4.1", optional = true }
+tracing = "0.1"
+tyfling = "0.1.1"
+miette = "7.4.0"
+thiserror = "2.0.6"
+spanner = { path = "../spanner", features = ["miette"] }
+
 clap = { version = "4.5.17", features = ["derive"], optional = true }
+tracing-subscriber = { version = "0.3.19", optional = true }
+tracing-fancytree = { version = "0.0.1", optional = true, path = "../tracing-fancytree" }
+hashbrown = "0.15.2"
 
 [features]
 default = []
-ariadne = ["dep:ariadne"]
-cli = ["dep:clap", "ariadne"]
+cli = ["dep:clap", "miette/fancy"]
+cli-trace = ["dep:tracing-subscriber", "dep:tracing-fancytree"]
 
 [[bin]]
 name = "markdoll"
 required-features = ["cli"]
-
-[[test]]
-name = "parses_own_spec"
-required-features = ["ariadne"]

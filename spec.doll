@@ -51,7 +51,7 @@ awawa!
 								block content
 							]
 						]
-					-	invokes [code:sometag], does not provide an argument, but provides content[ref(tag-block-content)]
+					-	invokes [code:sometag], does not provide an argument, but provides content[ref(block-tags)]
 
 				-	=	arg & content
 					-	[codeblock(doll)::
@@ -60,12 +60,12 @@ awawa!
 								block content
 							]
 						]
-					-	invokes [code:sometag], providing an argument and content[ref(tag-block-content)]
+					-	invokes [code:sometag], providing an argument and content[ref(block-tags)]
 			]
 
-			[def(tag-block-content)::
-				block content allows far more flexibility in the content of tags, being able to put anything inside of them,
-				without markdoll interpreting it whatsoever, leaving that to that tag
+			[def(block-tags)::
+				block tags allow far more flexibility in the content of tags, being able to put anything inside of them,
+				without markdoll interpreting it whatsoever, leaving that to that tag (including escape sequences!)
 
 				however, this requires that the content is indented one level further than the tag, to let the parser know what is and is not part of the content
 			]

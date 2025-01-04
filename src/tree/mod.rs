@@ -1,9 +1,13 @@
 pub(crate) mod parser;
 
-use crate::{emit::BuiltInEmitters, MarkDoll, TagDiagnosticTranslation};
-
-/// block syntax tree
-pub type AST = Vec<BlockItem>;
+use {
+	crate::{
+		diagnostics::DiagnosticKind,
+		emit::{AcceptableTagEmitTargets, EmitDiagnostic},
+		MarkDoll,
+	},
+	::spanner::{Span, Spanned},
+};
 
 /// tag content, effectively just [`Any`](core::any::Any) with [`Debug`](core::fmt::Debug)
 pub trait TagContent: ::downcast_rs::Downcast + ::core::fmt::Debug {}
@@ -16,55 +20,49 @@ impl<T: ::downcast_rs::Downcast + ::core::fmt::Debug> TagContent for T {}
 #[derive(Debug)]
 pub struct TagInvocation {
 	/// the tag name
-	pub tag: String,
+	pub name: Span,
 	/// the arguments to the tag
-	pub args: Vec<String>,
+	pub args: Vec<Span>,
 	/// the content returned by the tag
 	pub content: Box<dyn TagContent>,
-	pub(crate) diagnostic_translation: Option<TagDiagnosticTranslation>,
 }
 
 impl TagInvocation {
 	/// emit into an output
 	pub fn emit<To: 'static>(&mut self, doll: &mut MarkDoll, to: &mut To) {
-		doll.diagnostic_translations
-			.push(self.diagnostic_translation.take().unwrap());
-
 		let def = doll
-			.ext_system
 			.tags
-			.get(&*self.tag)
+			.get(&*doll.spanner.lookup_span(self.name))
 			.expect("tag not defined, this should've been handled by the parser");
 
-		match def.emitter_for::<To>() {
-			Some(emit) => emit(doll, to, &mut self.content),
-			None => doll.diag(
-				true,
-				usize::MAX,
-				if def.has_any_emitters() {
-					"this tag does not support emitting for this emit target"
-				} else {
-					"this tag cannot be emitted"
-				},
-			),
+		match def.emitters.get::<To>() {
+			Some(emit) => emit(doll, to, &mut self.content, self.name),
+			None => {
+				let acceptable = AcceptableTagEmitTargets(def.emitters.type_names().collect());
+				let (at, context) = doll.resolve_span(self.name);
+				doll.diag(DiagnosticKind::Emit(EmitDiagnostic::TagCannotEmitTo {
+					at,
+					context,
+					bad: ::core::any::type_name::<To>(),
+					acceptable,
+				}));
+			}
 		}
-
-		self.diagnostic_translation = Some(doll.diagnostic_translations.pop().unwrap());
 	}
 }
+
+/// block syntax tree
+pub type AST = Vec<Spanned<BlockItem>>;
 
 /// an inline item, containing real content
 #[derive(Debug)]
 pub enum InlineItem {
 	/// a line split, caused by a single unescaped newline
 	Split,
-
 	/// a line break, caused by an escaped newline
 	Break,
-
 	/// it's text.
 	Text(String),
-
 	/// a tag invocation
 	Tag(TagInvocation),
 }
@@ -73,22 +71,18 @@ pub enum InlineItem {
 #[derive(Debug)]
 pub enum BlockItem {
 	/// inline items
-	Inline(Vec<(usize, InlineItem)>),
+	Inline(Vec<Spanned<InlineItem>>),
 
 	/// a section, containing a numerical level, heading content, and body
 	Section {
-		/// position of the & defining the section
-		pos: usize,
 		/// heading text
-		name: String,
+		header: Vec<Spanned<InlineItem>>,
 		/// content of the section
 		children: AST,
 	},
 
 	/// an ordered or unordered list, containing several items
 	List {
-		/// position of the list start
-		pos: usize,
 		/// whether the list is ordered
 		ordered: bool,
 		/// the items
@@ -101,14 +95,18 @@ impl BlockItem {
 	pub fn emit<To: 'static>(&mut self, doll: &mut MarkDoll, to: &mut To, inline_block: bool) {
 		let builtin_emitters = doll
 			.builtin_emitters
-			.get_ref::<BuiltInEmitters<To>>()
+			.get::<To>()
 			.expect("no BuiltInEmitters defined for this emit target");
 
 		match self {
 			Self::Inline(segments) => {
 				(builtin_emitters.inline)(doll, to, segments, inline_block);
 			}
-			Self::Section { name, children, .. } => {
+			Self::Section {
+				header: name,
+				children,
+				..
+			} => {
 				(builtin_emitters.section)(doll, to, name, children);
 			}
 			Self::List { ordered, items, .. } => {

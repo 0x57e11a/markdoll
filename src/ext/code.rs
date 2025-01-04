@@ -1,4 +1,13 @@
-use crate::{args, emit::HtmlEmit, ext::TagDefinition, tree::TagContent, MarkDoll};
+use {
+	crate::{
+		args,
+		emit::html::HtmlEmit,
+		ext::{Emitters, TagDefinition, TagEmitter},
+		tree::TagContent,
+		MarkDoll,
+	},
+	::spanner::Span,
+};
 
 /// `code` tag
 ///
@@ -13,15 +22,24 @@ pub mod code {
 	/// the tag
 	#[must_use]
 	pub fn tag() -> TagDefinition {
-		TagDefinition::new("code", Some(|_, _, text| Some(Box::new(text.to_string()))))
-			.with_emitter::<HtmlEmit>(html)
+		TagDefinition {
+			key: "code",
+			parse: |_, _, text, _| Some(Box::new(Span::from(text))),
+			emitters: Emitters::<TagEmitter>::new().with(html),
+		}
 	}
 
 	/// emit to html
-	pub fn html(_: &mut MarkDoll, to: &mut HtmlEmit, content: &mut Box<dyn TagContent>) {
+	pub fn html(
+		doll: &mut MarkDoll,
+		to: &mut HtmlEmit,
+		content: &mut Box<dyn TagContent>,
+		_: Span,
+	) {
 		to.write.push_str(&format!(
 			"<code>{}</code>",
-			content.downcast_ref::<String>().unwrap()
+			doll.spanner
+				.lookup_span(*content.downcast_ref::<Span>().unwrap())
 		));
 	}
 }
@@ -45,45 +63,56 @@ pub mod codeblock {
 	#[derive(Debug)]
 	pub struct Block {
 		/// the language
-		pub lang: Option<String>,
+		pub lang: Option<Span>,
 		/// the text
-		pub text: String,
+		pub text: Span,
 	}
 
 	/// the tag
 	#[must_use]
 	pub fn tag() -> TagDefinition {
-		TagDefinition::new(
-			"codeblock",
-			Some(|doll, mut args, text| {
+		TagDefinition {
+			key: "codeblock",
+			parse: |mut doll, args, text, tag_span| {
 				args! {
-					doll, args;
+					args;
+					doll, tag_span;
 
 					args();
-					opt_args(lang: String);
+					opt_args(lang);
 					flags();
-					props();
+					props(waw, wawa: usize);
 				};
 
 				Some(Box::new(Block {
-					lang,
-					text: text.to_string(),
+					lang: lang.map(Into::into),
+					text: text.into(),
 				}))
-			}),
-		)
-		.with_emitter::<HtmlEmit>(html)
+			},
+			emitters: Emitters::<TagEmitter>::new().with(html),
+		}
 	}
 
 	/// emit to html
-	pub fn html(doll: &mut MarkDoll, to: &mut HtmlEmit, content: &mut Box<dyn TagContent>) {
+	pub fn html(
+		doll: &mut MarkDoll,
+		to: &mut HtmlEmit,
+		content: &mut Box<dyn TagContent>,
+		_: Span,
+	) {
 		let code = content.downcast_ref::<Block>().unwrap();
 
 		if let Some(lang) = &code.lang {
-			(to.code_block_format.clone())(doll, to, lang, &code.text);
+			(to.code_block_format.clone())(
+				doll,
+				to,
+				doll.spanner.lookup_span(*lang),
+				doll.spanner.lookup_span(code.text),
+			);
 		} else {
 			to.write.push_str(&format!(
 				"<div class='doll-code-block'><pre>{}</pre></div>",
-				&html_escape::encode_text(&code.text)
+				&html_escape::encode_text(&*doll.spanner.lookup_span(code.text))
 			));
 		}
 	}
