@@ -6,7 +6,7 @@ use {
 	::miette::{LabeledSpan, SourceSpan},
 	::spanner::{Loc, Locd, Span, Spanned, SpannerExt, SrcSpan},
 	::std::sync::Mutex,
-	::tracing::{info, instrument, trace, trace_span, Level},
+	::tracing::{info, instrument, span::EnteredSpan, trace, trace_span, Level},
 };
 
 #[derive(::thiserror::Error, ::miette::Diagnostic, Debug)]
@@ -151,13 +151,11 @@ struct Stream {
 }
 
 impl Stream {
-	#[instrument(level = Level::TRACE, ret)]
 	pub fn char_at(&self, i: u32) -> Option<char> {
 		self.src[i as usize..].chars().next()
 	}
 
 	#[allow(clippy::should_implement_trait, reason = "not bothering")]
-	#[instrument(level = Level::TRACE, ret)]
 	pub fn next(&mut self) -> Option<char> {
 		if self.at - self.src.start() < self.src.len() as u32 {
 			let ch = self.lookahead(1);
@@ -168,12 +166,10 @@ impl Stream {
 		}
 	}
 
-	#[instrument(level = Level::TRACE, ret)]
 	pub fn skip(&mut self) {
 		self.at = self.lookahead_loc(2).unwrap();
 	}
 
-	#[instrument(level = Level::TRACE, ret)]
 	pub fn back(&mut self) {
 		self.at = self.lookahead_loc(0).unwrap();
 	}
@@ -202,13 +198,12 @@ impl Stream {
 		}
 	}
 
-	#[instrument(level = Level::TRACE, ret)]
 	pub fn lookahead_loc(&self, mut n: i32) -> Option<Loc> {
 		n -= 1;
 		let mut offset = self.at - self.src.start();
 
 		if n > 0 {
-			for i in 0..n {
+			for _ in 0..n {
 				if offset >= self.src.len() as u32 {
 					return None;
 				}
@@ -224,7 +219,7 @@ impl Stream {
 				}
 			}
 		} else if n <= 0 {
-			for i in n..0 {
+			for _ in n..0 {
 				if offset < 1 {
 					return None;
 				}
@@ -236,12 +231,9 @@ impl Stream {
 			}
 		}
 
-		trace!(?offset, "post");
-
 		Some(self.src.start() + offset)
 	}
 
-	#[instrument(level = Level::TRACE, ret)]
 	pub fn lookahead(&self, n: i32) -> Option<char> {
 		self.char_at(self.lookahead_loc(n)? - self.src.start())
 	}
@@ -262,26 +254,23 @@ impl Stream {
 		(self.src.end() - 1).with_len(0)
 	}
 
-	#[instrument(level = Level::TRACE)]
 	pub fn tr(&mut self) -> StreamTransaction {
-		StreamTransaction(self.at)
+		StreamTransaction(self.at, trace_span!("transaction", ?self).entered())
 	}
 
 	#[allow(clippy::unused_self, reason = "consistency")]
-	#[instrument(level = Level::TRACE)]
-	pub fn tr_commit(&mut self, trans: StreamTransaction) {
-		core::mem::forget(trans);
+	pub fn tr_commit(&mut self, _: StreamTransaction) {
+		trace!("committed transaction");
 	}
 
-	#[instrument(level = Level::TRACE)]
 	pub fn tr_cancel(&mut self, trans: StreamTransaction) {
+		trace!(returning_to = ?trans.0, "canceled transaction");
 		self.at = trans.0;
-		core::mem::forget(trans);
 	}
 }
 
 #[tyfling::debug("transaction{f0:?}")]
-struct StreamTransaction(Loc);
+struct StreamTransaction(Loc, EnteredSpan);
 
 #[tyfling::debug(
 	"{stream:?}\n[{}] <- [{}]",
@@ -446,7 +435,7 @@ impl<'doll> Ctx<'doll> {
 
 		let mut inline = ::core::mem::take(&mut self.inline);
 		let span = if !inline.is_empty() {
-			inline.first().unwrap().0.union(inline.last().unwrap().0)
+			inline.first().unwrap().0.union(&inline.last().unwrap().0)
 		} else {
 			return;
 		};
@@ -546,6 +535,37 @@ pub fn frontmatter(ctx: &mut Ctx) -> Option<String> {
 			Some('\n') => {
 				if ctx.stream.eat_all('-') == 3 {
 					ctx.stream.tr_commit(tr);
+
+					match ctx.stream.next() {
+						Some('\n') => {}
+
+						Some(ch) => {
+							if ch == '\r' {
+								ctx.crlf_explode();
+							}
+
+							let (at, context) = ctx.doll.resolve_span(Span::new(
+								ctx.stream.lookahead_loc(0).unwrap(),
+								loop {
+									match ctx.stream.next() {
+										Some('\n') | None => {
+											break ctx.stream.lookahead_loc(0).unwrap()
+										}
+										_ => {}
+									}
+								},
+							));
+							ctx.diag(LangDiagnostic::Unexpected {
+								primary: at,
+								context: context,
+								unexpected: "chars",
+								expected: &["newline"],
+							});
+						}
+
+						None => {}
+					}
+
 					return Some(frontmatter);
 				}
 
@@ -881,7 +901,7 @@ mod tag {
 						let (primary, context) = ctx.doll.resolve_span(
 							ctx.stream
 								.lookahead_span(-1)
-								.union(ctx.stream.lookahead_span(0)),
+								.union(&ctx.stream.lookahead_span(0)),
 						);
 						ctx.diag(LangDiagnostic::CannotEscapeHere {
 							primary,
@@ -895,7 +915,7 @@ mod tag {
 						let (primary, context) = ctx.doll.resolve_span(
 							ctx.stream
 								.lookahead_span(-1)
-								.union(ctx.stream.lookahead_span(0)),
+								.union(&ctx.stream.lookahead_span(0)),
 						);
 						ctx.diag(LangDiagnostic::CannotEscape {
 							primary,
@@ -1030,7 +1050,7 @@ mod tag {
 						let (primary, context) = ctx.doll.resolve_span(
 							ctx.stream
 								.lookahead_span(-1)
-								.union(ctx.stream.lookahead_span(0)),
+								.union(&ctx.stream.lookahead_span(0)),
 						);
 						ctx.diag(LangDiagnostic::CannotEscape {
 							primary,
@@ -1455,7 +1475,7 @@ pub(crate) fn parse(ctx: &mut Ctx) -> (bool, AST) {
 											let (primary, context) = ctx.doll.resolve_span(
 												ctx.stream
 													.lookahead_span(-1)
-													.union(ctx.stream.lookahead_span(0)),
+													.union(&ctx.stream.lookahead_span(0)),
 											);
 											ctx.diag(LangDiagnostic::CannotEscape {
 												primary,
@@ -1475,7 +1495,7 @@ pub(crate) fn parse(ctx: &mut Ctx) -> (bool, AST) {
 												InlineItem::Break.spanned(
 													ctx.stream
 														.lookahead_span(-1)
-														.union(ctx.stream.lookahead_span(0)),
+														.union(&ctx.stream.lookahead_span(0)),
 												),
 											);
 

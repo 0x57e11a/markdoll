@@ -128,7 +128,7 @@ impl MarkDoll {
 	/// # errors
 	///
 	/// if the operation does not succeed, the [`AST`] may be in an incomplete/incorrect state
-	#[instrument(level = Level::INFO)]
+	#[instrument(skip(self), level = Level::INFO)]
 	pub fn parse_embedded(&mut self, src: Span) -> (bool, AST) {
 		// stash state
 		let old_ok = ::core::mem::replace(&mut self.ok, true);
@@ -150,7 +150,7 @@ impl MarkDoll {
 	/// - the diagnostics produced during the operation (may not be ampty on success)
 	/// - the frontmatter
 	/// - the [AST]
-	#[instrument(level = Level::INFO, ret)]
+	#[instrument(skip(self), level = Level::INFO, ret)]
 	pub fn parse_document(
 		&mut self,
 		filename: String,
@@ -181,7 +181,7 @@ impl MarkDoll {
 	/// returns
 	/// - whether the operation was successful
 	/// - the diagnostics produced during the operation (may not be ampty on success)
-	#[instrument(level = Level::INFO)]
+	#[instrument(skip(self), level = Level::INFO)]
 	pub fn emit<To: Debug + 'static>(
 		&mut self,
 		ast: &mut AST,
@@ -212,7 +212,7 @@ impl MarkDoll {
 
 	/// emit a diagnostic, mapping the position accordingly
 	#[track_caller]
-	#[instrument(level = Level::ERROR)]
+	#[instrument(skip(self), level = Level::ERROR)]
 	pub fn diag(&mut self, diagnostic: DiagnosticKind) {
 		if let None | Some(Severity::Error) = diagnostic.severity() {
 			self.ok = false;
