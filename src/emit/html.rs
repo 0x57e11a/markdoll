@@ -70,28 +70,29 @@ impl HtmlEmit {
 
 			let level = to.section_level;
 			if level <= 6 {
-				to.write
-					.push_str(&format!("<section data-level='{level}'><h{level}>"));
+				to.write.push_str(&format!("<h{level}>"));
 
 				inline(doll, to, header, false);
 
-				to.write.push_str(&format!("</h{level}><div>"));
+				to.write.push_str(&format!("</h{level}>"));
 			} else {
-				to.write.push_str(&format!(
-					"<section data-level='{level}'><div role='heading' aria-level='{level}'>",
-				));
+				to.write
+					.push_str(&format!("<div role='heading' aria-level='{level}'>",));
 
 				inline(doll, to, header, false);
 
-				to.write.push_str(&format!("</div><div>",));
+				to.write.push_str("</div>");
 			}
 
-			let inline_block = children.len() > 1;
+			to.write.push_str(&format!(
+				"<section class='doll-section' data-level='{level}'>"
+			));
+
 			for Spanned(_, child) in children {
-				child.emit(doll, &mut *to, inline_block);
+				child.emit(doll, &mut *to, true);
 			}
 
-			to.write.push_str("</div></section>");
+			to.write.push_str("</section>");
 
 			to.section_level -= 1;
 		}
