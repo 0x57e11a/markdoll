@@ -123,24 +123,17 @@ impl MarkDoll {
 
 	/// parse the input into an AST, used to parse the content of tags in an existing parse operation
 	///
-	/// returns whether the fragment parsed successfully, and the produced [`AST`]
+	/// returns the produced [`AST`]
 	///
 	/// # errors
 	///
 	/// if the operation does not succeed, the [`AST`] may be in an incomplete/incorrect state
 	#[instrument(skip(self), level = Level::INFO)]
-	pub fn parse_embedded(&mut self, src: Span) -> (bool, AST) {
-		// stash state
-		let old_ok = ::core::mem::replace(&mut self.ok, true);
-
-		// parse
+	pub fn parse_embedded(&mut self, src: Span) -> AST {
 		let mut ctx = parser::Ctx::new(self, src);
 		let (ok, ast) = parser::parse(&mut ctx);
-
-		// restore stash
-		let _ = ::core::mem::replace(&mut self.ok, old_ok);
-
-		(ok, ast)
+		self.ok &= ok;
+		ast
 	}
 
 	/// parse a complete document into an AST, including frontmatter

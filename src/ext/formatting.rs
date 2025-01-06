@@ -80,11 +80,7 @@ pub mod emphasis {
 					strikethrough: s,
 					highlight: h,
 					quote: q,
-					ast: {
-						let (ok, ast) = doll.parse_embedded(text.into());
-						doll.ok &= ok;
-						ast
-					},
+					ast: doll.parse_embedded(text.into()),
 				}))
 			},
 			emitters: Emitters::<TagEmitter>::new().with(html),
@@ -195,11 +191,7 @@ pub mod quote {
 
 				Some(Box::new(Quote {
 					cite,
-					ast: {
-						let (ok, ast) = doll.parse_embedded(text.into());
-						doll.ok &= ok;
-						ast
-					},
+					ast: doll.parse_embedded(text.into()),
 				}))
 			},
 			emitters: Emitters::<TagEmitter>::new().with(html),

@@ -140,15 +140,12 @@ pub mod table {
 					})));
 				}
 
-				let (ok, ast) = doll.parse_embedded(text.into());
-				doll.ok &= ok;
-
 				let mut table = Table {
 					head: Vec::new(),
 					body: Vec::new(),
 				};
 
-				for Spanned(span, child) in ast {
+				for Spanned(span, child) in doll.parse_embedded(text.into()) {
 					match child {
 						BlockItem::Inline(items) => {
 							for Spanned(span, item) in items {
@@ -295,11 +292,7 @@ pub mod tr {
 					flags(head);
 				}
 
-				let ast = {
-					let (ok, ast) = doll.parse_embedded(text.into());
-					doll.ok &= ok;
-					ast
-				};
+				let ast = doll.parse_embedded(text.into());
 
 				Some(Box::new(Row {
 					is_head: head,
@@ -357,11 +350,7 @@ pub mod tc {
 					is_head: head,
 					rows: rows.unwrap_or(1),
 					cols: cols.unwrap_or(1),
-					ast: {
-						let (ok, ast) = doll.parse_embedded(text.into());
-						doll.ok &= ok;
-						ast
-					},
+					ast: doll.parse_embedded(text.into()),
 				}))
 			},
 			emitters: Emitters::<TagEmitter>::new(),

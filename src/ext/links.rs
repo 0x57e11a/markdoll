@@ -49,12 +49,9 @@ pub mod link {
 					props();
 				};
 
-				let (ok, ast) = doll.parse_embedded(text.into());
-				doll.ok &= ok;
-
 				Some(Box::new(Link {
 					href: href.into(),
-					ast,
+					ast: doll.parse_embedded(text.into()),
 				}))
 			},
 			emitters: Emitters::<TagEmitter>::new().with(html),
@@ -185,11 +182,7 @@ pub mod definition {
 
 				Some(Box::new(Link {
 					href: href.into(),
-					ast: {
-						let (ok, ast) = doll.parse_embedded(text.into());
-						doll.ok &= ok;
-						ast
-					},
+					ast: doll.parse_embedded(text.into()),
 				}))
 			},
 			emitters: Emitters::<TagEmitter>::new().with(html),
