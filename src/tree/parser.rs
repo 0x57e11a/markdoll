@@ -1019,6 +1019,7 @@ mod tag {
 	fn parse_arg(ctx: &mut Ctx) -> ParseResult<Span> {
 		let start = ctx.stream.lookahead_loc(0).unwrap();
 		let mut arg = String::new();
+		let mut paren_stack: usize = 0;
 
 		'arg: loop {
 			match ctx.stream.next() {
@@ -1042,8 +1043,6 @@ mod tag {
 						expected: &["argument", "`)`", "`\\`"],
 					});
 				}
-
-				Some(')') => break 'arg,
 
 				Some('\\') => match ctx.stream.next() {
 					Some(ch @ '\n') | Some(ch @ '\t') => {
@@ -1081,6 +1080,19 @@ mod tag {
 						return ParseResult::Stop;
 					}
 				},
+
+				Some('(') => {
+					arg.push('(');
+					paren_stack += 1;
+				}
+				Some(')') => {
+					if paren_stack > 0 {
+						arg.push(')');
+						paren_stack -= 1;
+					} else {
+						break;
+					}
+				}
 
 				Some(ch) => {
 					if ch == '\r' {
@@ -1133,9 +1145,8 @@ mod tag {
 					primary,
 					context,
 					unexpected: "newline",
-					expected: &["tag content", "`]`", "`\\`"],
+					expected: &["tag content", "`:`", "`]`", "`\\`"],
 				});
-
 				return ParseResult::Ok(());
 			}
 
@@ -1245,7 +1256,7 @@ mod tag {
 							unexpected: "newline",
 							expected: &["tag name", "`(`", "`:`", "`]`"],
 						});
-						break ctx.stream.lookahead_loc(-1).unwrap();
+						return ParseResult::NextLine;
 					}
 
 					Some('\t') => {
