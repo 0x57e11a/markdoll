@@ -71,7 +71,7 @@ macro_rules! args {
 		$(props($($prop:ident$(: $prop_ty:ty)?),*);)?
 	} => {
 		#[allow(unused, reason = "macro")]
-		let (mut doll, mut args) = (&mut $doll, $args);
+		let (mut doll, mut args) = (&mut *$doll, $args);
 
 		args! {
 			&mut args;

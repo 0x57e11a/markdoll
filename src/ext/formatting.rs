@@ -62,7 +62,7 @@ pub mod emphasis {
 	pub fn tag() -> TagDefinition {
 		TagDefinition {
 			key: "em",
-			parse: |mut doll, args, text, tag_span| {
+			parse: |doll, args, text, tag_span| {
 				args! {
 					args;
 					doll, tag_span;
@@ -175,7 +175,7 @@ pub mod quote {
 	pub fn tag() -> TagDefinition {
 		TagDefinition {
 			key: "quote",
-			parse: |mut doll, args, text, tag_span| {
+			parse: |doll, args, text, tag_span| {
 				args! {
 					args;
 					doll, tag_span;
@@ -227,6 +227,6 @@ pub mod quote {
 
 /// all of this module's tags
 #[must_use]
-pub fn tags() -> [TagDefinition; 2] {
+pub fn tags() -> impl IntoIterator<Item = TagDefinition> {
 	[emphasis::tag(), quote::tag()]
 }

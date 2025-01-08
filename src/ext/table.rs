@@ -125,7 +125,7 @@ pub mod table {
 	pub fn tag() -> TagDefinition {
 		TagDefinition {
 			key: "table",
-			parse: |mut doll, args, text, tag_span| {
+			parse: |doll, args, text, tag_span| {
 				args! {
 					args;
 					doll, tag_span;
@@ -284,7 +284,7 @@ pub mod tr {
 	pub fn tag() -> TagDefinition {
 		TagDefinition {
 			key: "tr",
-			parse: |mut doll, args, text, tag_span| {
+			parse: |doll, args, text, tag_span| {
 				args! {
 					args;
 					doll, tag_span;
@@ -335,7 +335,7 @@ pub mod tc {
 	pub fn tag() -> TagDefinition {
 		TagDefinition {
 			key: "tc",
-			parse: |mut doll, args, text, tag_span| {
+			parse: |doll, args, text, tag_span| {
 				args! {
 					args;
 					doll, tag_span;
@@ -360,6 +360,6 @@ pub mod tc {
 
 /// all of this module's tags
 #[must_use]
-pub fn tags() -> [TagDefinition; 3] {
+pub fn tags() -> impl IntoIterator<Item = TagDefinition> {
 	[table::tag(), tr::tag(), tc::tag()]
 }

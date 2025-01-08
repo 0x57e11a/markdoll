@@ -38,7 +38,7 @@ pub mod link {
 	pub fn tag() -> TagDefinition {
 		TagDefinition {
 			key: "link",
-			parse: |mut doll, args, text, tag_span| {
+			parse: |doll, args, text, tag_span| {
 				args! {
 					args;
 					doll, tag_span;
@@ -108,7 +108,7 @@ pub mod image {
 	pub fn tag() -> TagDefinition {
 		TagDefinition {
 			key: "img",
-			parse: |mut doll, args, text, tag_span| {
+			parse: |doll, args, text, tag_span| {
 				args! {
 					args;
 					doll, tag_span;
@@ -169,7 +169,7 @@ pub mod definition {
 	pub fn tag() -> TagDefinition {
 		TagDefinition {
 			key: "def",
-			parse: |mut doll, args, text, tag_span| {
+			parse: |doll, args, text, tag_span| {
 				args! {
 					args;
 					doll, tag_span;
@@ -232,7 +232,7 @@ pub mod reference {
 	pub fn tag() -> TagDefinition {
 		TagDefinition {
 			key: "ref",
-			parse: |mut doll, args, text, tag_span| {
+			parse: |doll, args, text, tag_span| {
 				args! {
 					args;
 					doll, tag_span;
@@ -272,7 +272,7 @@ pub mod reference {
 
 /// all of this module's tags
 #[must_use]
-pub fn tags() -> [TagDefinition; 4] {
+pub fn tags() -> impl IntoIterator<Item = TagDefinition> {
 	[
 		link::tag(),
 		image::tag(),

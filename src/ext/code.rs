@@ -73,7 +73,7 @@ pub mod codeblock {
 	pub fn tag() -> TagDefinition {
 		TagDefinition {
 			key: "codeblock",
-			parse: |mut doll, args, text, tag_span| {
+			parse: |doll, args, text, tag_span| {
 				args! {
 					args;
 					doll, tag_span;
@@ -102,24 +102,15 @@ pub mod codeblock {
 	) {
 		let code = content.downcast_ref::<Block>().unwrap();
 
-		if let Some(lang) = &code.lang {
-			(to.code_block_format.clone())(
-				doll,
-				to,
-				doll.spanner.lookup_span(*lang),
-				doll.spanner.lookup_span(code.text),
-			);
-		} else {
-			to.write.push_str(&format!(
-				"<div class='doll-code-block'><pre>{}</pre></div>",
-				&html_escape::encode_text(&*doll.spanner.lookup_span(code.text))
-			));
-		}
+		to.write.push_str(&format!(
+			"<div class='doll-code-block'><pre>{}</pre></div>",
+			&html_escape::encode_text(&*doll.spanner.lookup_span(code.text))
+		));
 	}
 }
 
 /// all of this module's tags
 #[must_use]
-pub fn tags() -> [TagDefinition; 2] {
+pub fn tags() -> impl IntoIterator<Item = TagDefinition> {
 	[code::tag(), codeblock::tag()]
 }

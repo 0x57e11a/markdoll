@@ -30,6 +30,10 @@ pub mod comment {
 /// `!` tag
 ///
 /// always error
+///
+/// # content
+///
+/// the error to emit
 pub mod error {
 	use super::*;
 
@@ -38,7 +42,7 @@ pub mod error {
 	pub fn tag() -> TagDefinition {
 		TagDefinition {
 			key: "!",
-			parse: |doll, _, text, tag_span| {
+			parse: |doll, _, text, _| {
 				let (at, context) = doll.resolve_span(text.span());
 				let mut labels = vec![LabeledSpan::new_primary_with_span(
 					Some("error message".to_string()),
@@ -61,6 +65,6 @@ pub mod error {
 
 /// all of this module's tags
 #[must_use]
-pub fn tags() -> [TagDefinition; 2] {
+pub fn tags() -> impl IntoIterator<Item = TagDefinition> {
 	[comment::tag(), error::tag()]
 }
