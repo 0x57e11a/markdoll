@@ -18,18 +18,12 @@ pub type CodeBlockFormatter =
 	dyn Fn(&mut MarkDoll, &mut HtmlEmit, SrcSpan<MarkDollSrc>, SrcSpan<MarkDollSrc>);
 
 /// emit to HTML
+#[derive(Default)]
 pub struct HtmlEmit {
 	/// HTML buffer
 	pub write: String,
 	/// heading level, initialize this to 0
 	pub section_level: usize,
-	/// emit a code block with a given language
-	///
-	/// - `doll` - markdoll instance
-	/// - `emit` - emit target
-	/// - `lang` - language requested
-	/// - `src` - content
-	pub code_block_format: Rc<CodeBlockFormatter>,
 }
 
 impl HtmlEmit {
