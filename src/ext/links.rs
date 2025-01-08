@@ -44,9 +44,6 @@ pub mod link {
 					doll, tag_span;
 
 					args(href);
-					opt_args();
-					flags();
-					props();
 				};
 
 				Some(Box::new(Link {
@@ -114,9 +111,6 @@ pub mod image {
 					doll, tag_span;
 
 					args(src);
-					opt_args();
-					flags();
-					props();
 				};
 
 				Some(Box::new(Image {
@@ -175,9 +169,6 @@ pub mod definition {
 					doll, tag_span;
 
 					args(href);
-					opt_args();
-					flags();
-					props();
 				};
 
 				Some(Box::new(Link {
@@ -238,9 +229,6 @@ pub mod reference {
 					doll, tag_span;
 
 					args(href);
-					opt_args();
-					flags();
-					props();
 				};
 
 				if !text.is_empty() {

@@ -340,8 +340,6 @@ pub mod tc {
 					args;
 					doll, tag_span;
 
-					args();
-					opt_args();
 					flags(head);
 					props(rows: usize, cols: usize);
 				}

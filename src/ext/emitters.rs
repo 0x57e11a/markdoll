@@ -4,9 +4,6 @@ use {
 	::hashbrown::HashMap,
 };
 
-/// never used, just makes sure an emitter is never called accidentally
-enum Uncallable {}
-
 /// hashmap of typeid->value, supporting up to 1 value per type
 #[derive(Debug, Clone, Default)]
 pub struct Emitters<Variant: EmittersVariant> {
@@ -14,9 +11,10 @@ pub struct Emitters<Variant: EmittersVariant> {
 }
 
 impl<Variant: EmittersVariant> Emitters<Variant> {
+	/// create a new typemap
 	pub fn new() -> Self {
 		Self {
-			inner: HashMap::with_capacity(2),
+			inner: HashMap::with_capacity(1),
 		}
 	}
 
@@ -64,6 +62,7 @@ impl<Variant: EmittersVariant> Emitters<Variant> {
 		self.inner.is_empty()
 	}
 
+	/// the names of the types that have values in this map
 	#[must_use]
 	pub fn type_names(&self) -> impl Iterator<Item = &'static str> + use<'_, Variant> {
 		self.inner.values().map(|value| value.1)

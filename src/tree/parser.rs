@@ -6,7 +6,7 @@ use {
 	::miette::{LabeledSpan, SourceSpan},
 	::spanner::{Loc, Locd, Span, Spanned, SpannerExt, SrcSpan},
 	::std::sync::Mutex,
-	::tracing::{info, instrument, span::EnteredSpan, trace, trace_span, Level},
+	::tracing::{instrument, span::EnteredSpan, trace, trace_span, Level},
 };
 
 #[derive(::thiserror::Error, ::miette::Diagnostic, Debug)]
@@ -1411,8 +1411,13 @@ pub(crate) fn parse(ctx: &mut Ctx) -> (bool, AST) {
 				loop {
 					match ctx.stream.next() {
 						Some('\n') => {
-							ctx.inline
-								.push(InlineItem::Split.spanned(ctx.stream.lookahead_span(0)));
+							if let Some(Spanned(_, InlineItem::Text(_) | InlineItem::Tag(_))) =
+								ctx.inline.last()
+							{
+								ctx.inline
+									.push(InlineItem::Split.spanned(ctx.stream.lookahead_span(0)));
+							}
+
 							continue 'main;
 						}
 

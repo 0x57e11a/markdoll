@@ -51,7 +51,7 @@ pub mod code {
 /// # arguments
 ///
 /// - (optional) `lang`:\
-///   the language code to highlight, modify [`doll.builtin_emitters.code_block`](crate::emit::BuiltInEmitters::code_block) to define behavior
+///   the language code to highlight (by default this isn't used, override the emitter to customize this)
 ///
 /// # content
 ///
@@ -78,10 +78,7 @@ pub mod codeblock {
 					args;
 					doll, tag_span;
 
-					args();
 					opt_args(lang);
-					flags();
-					props(waw, wawa: usize);
 				};
 
 				Some(Box::new(Block {

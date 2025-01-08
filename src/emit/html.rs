@@ -5,7 +5,6 @@ use {
 		MarkDoll, MarkDollSrc,
 	},
 	::spanner::{Spanned, SrcSpan},
-	::std::rc::Rc,
 };
 
 /// emit a code block with a given language
@@ -34,8 +33,11 @@ impl HtmlEmit {
 			segments: &mut [Spanned<InlineItem>],
 			inline_block: bool,
 		) {
+			let all_tags = segments
+				.iter()
+				.all(|segment| matches!(segment, Spanned(_, InlineItem::Tag(_))));
 			if inline_block {
-				to.write.push_str("<div>");
+				to.write.push_str(if all_tags { "<div>" } else { "<p>" });
 			}
 
 			for Spanned(_, segment) in segments {
@@ -50,7 +52,7 @@ impl HtmlEmit {
 			}
 
 			if inline_block {
-				to.write.push_str("</div>");
+				to.write.push_str(if all_tags { "</div>" } else { "</p>" });
 			}
 		}
 
