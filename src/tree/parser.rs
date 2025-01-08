@@ -386,14 +386,8 @@ impl<'doll> Ctx<'doll> {
 				});
 
 				if let Some(content) = tag::transform_content(self, name, &args, file.span()) {
-					self.inline.push(
-						InlineItem::Tag(TagInvocation {
-							name,
-							args,
-							content,
-						})
-						.spanned(name),
-					);
+					self.inline
+						.push(InlineItem::Tag(TagInvocation { name, content }).spanned(name));
 				}
 			}
 		}
@@ -1212,12 +1206,8 @@ mod tag {
 				if let Some((text, tag_end)) = parse_inline_text(ctx) {
 					if let Some(content) = transform_content(ctx, name, &args, text) {
 						ctx.inline.push(
-							InlineItem::Tag(TagInvocation {
-								name,
-								args,
-								content,
-							})
-							.spanned(Span::new(tag_start, tag_end)),
+							InlineItem::Tag(TagInvocation { name, content })
+								.spanned(Span::new(tag_start, tag_end)),
 						);
 					}
 				}
@@ -1341,7 +1331,6 @@ mod tag {
 						ctx.inline.push(
 							InlineItem::Tag(TagInvocation {
 								name: name,
-								args,
 								content,
 							})
 							.spanned(Span::new(start, ctx.stream.lookahead_loc(0).unwrap())),
@@ -1421,7 +1410,11 @@ pub(crate) fn parse(ctx: &mut Ctx) -> (bool, AST) {
 				// line loop
 				loop {
 					match ctx.stream.next() {
-						Some('\n') => continue 'main,
+						Some('\n') => {
+							ctx.inline
+								.push(InlineItem::Split.spanned(ctx.stream.lookahead_span(0)));
+							continue 'main;
+						}
 
 						Some('\t') => {
 							let (primary, context) =

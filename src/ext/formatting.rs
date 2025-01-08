@@ -67,10 +67,7 @@ pub mod emphasis {
 					args;
 					doll, tag_span;
 
-					args();
-					opt_args();
 					flags(i, b, u, s, h, q);
-					props();
 				};
 
 				Some(Box::new(Emphasis {
@@ -169,7 +166,7 @@ pub mod quote {
 	/// the content of the quote, and optionally a citation
 	#[derive(Debug)]
 	struct Quote {
-		pub cite: Option<String>,
+		pub cite: Option<AST>,
 		pub ast: AST,
 	}
 
@@ -183,14 +180,11 @@ pub mod quote {
 					args;
 					doll, tag_span;
 
-					args();
-					opt_args(cite: String);
-					flags();
-					props();
+					opt_args(cite);
 				}
 
 				Some(Box::new(Quote {
-					cite,
+					cite: cite.map(|cite| doll.parse_embedded(cite.into())),
 					ast: doll.parse_embedded(text.into()),
 				}))
 			},
@@ -209,11 +203,15 @@ pub mod quote {
 
 		to.write.push_str("<figure class='doll-quote'>");
 
-		if let Some(cite) = &quote.cite {
-			to.write.push_str(&format!(
-				"<figcaption>{}</figcaption>",
-				&html_escape::encode_text(cite)
-			));
+		if let Some(cite) = &mut quote.cite {
+			to.write.push_str("<figcaption>");
+
+			let inline_block = cite.len() > 1;
+			for Spanned(_, item) in cite {
+				item.emit(doll, to, inline_block);
+			}
+
+			to.write.push_str("</figcaption>");
 		}
 
 		to.write.push_str("<blockquote>");

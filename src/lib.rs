@@ -115,7 +115,7 @@ impl MarkDoll {
 	}
 
 	/// add multiple tags
-	pub fn add_tags<const N: usize>(&mut self, tags: [TagDefinition; N]) {
+	pub fn add_tags(&mut self, tags: impl IntoIterator<Item = TagDefinition>) {
 		for tag in tags {
 			self.add_tag(tag);
 		}

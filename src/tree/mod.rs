@@ -21,8 +21,6 @@ impl<T: ::downcast_rs::Downcast + ::core::fmt::Debug> TagContent for T {}
 pub struct TagInvocation {
 	/// the tag name
 	pub name: Span,
-	/// the arguments to the tag
-	pub args: Vec<Span>,
 	/// the content returned by the tag
 	pub content: Box<dyn TagContent>,
 }
