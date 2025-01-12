@@ -371,10 +371,13 @@ impl<'doll> Ctx<'doll> {
 			StackPart::BlockTag {
 				name,
 				args,
-				text,
+				mut text,
 				parent_span,
 				indent,
 			} => {
+				if !text.is_empty() {
+					assert_eq!(text.pop().unwrap(), '\n');
+				}
 				let file = self.doll.spanner.add(|start| MarkDollSrc {
 					metadata: SourceMetadata::BlockTag(TagDiagnosticTranslation {
 						span: Span::new(start, start + text.len() as u32), // todo
@@ -1574,9 +1577,7 @@ pub(crate) fn parse(ctx: &mut Ctx) -> (bool, AST) {
 			}
 			// special, just insert content straight into the tag
 			StackPart::BlockTag {
-				text: content,
-				parent_span,
-				..
+				text, parent_span, ..
 			} => {
 				let mut warn_cr = false;
 
@@ -1584,7 +1585,7 @@ pub(crate) fn parse(ctx: &mut Ctx) -> (bool, AST) {
 				'line: loop {
 					match ctx.stream.next() {
 						Some('\n') => {
-							content.push('\n');
+							text.push('\n');
 							*parent_span = Span::new(
 								parent_span.start(),
 								ctx.stream.lookahead_loc(0).unwrap(),
@@ -1593,7 +1594,7 @@ pub(crate) fn parse(ctx: &mut Ctx) -> (bool, AST) {
 						}
 
 						Some(ch) => {
-							content.push(ch);
+							text.push(ch);
 
 							if ch == '\r' {
 								warn_cr = true;
