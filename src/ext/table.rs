@@ -79,6 +79,7 @@ fn parse_row(doll: &mut MarkDoll, ast: AST) -> Vec<Cell> {
 			BlockItem::Inline(items) => {
 				for Spanned(span, item) in items {
 					match item {
+						InlineItem::Split | InlineItem::Break => {}
 						InlineItem::Tag(TagInvocation { content, .. }) => {
 							if let Ok(cell) = content.downcast::<Cell>() {
 								cells.push(*cell);
@@ -150,6 +151,7 @@ pub mod table {
 						BlockItem::Inline(items) => {
 							for Spanned(span, item) in items {
 								match item {
+									InlineItem::Split | InlineItem::Break => {}
 									InlineItem::Tag(TagInvocation { content, .. }) => {
 										if let Ok(row) = content.downcast::<Row>() {
 											if row.is_head {
@@ -219,7 +221,7 @@ pub mod table {
 
 		let table = content.downcast_mut::<Table>().unwrap();
 
-		to.write.push_str("<table>");
+		to.write.push_str("<div class='doll-table'><table>");
 
 		if !table.head.is_empty() {
 			to.write.push_str("<thead>");
@@ -253,7 +255,7 @@ pub mod table {
 			to.write.push_str("</tbody>");
 		}
 
-		to.write.push_str("</table>");
+		to.write.push_str("</table></div>");
 	}
 }
 
