@@ -1,5 +1,3 @@
-#![cfg(feature = "cli")]
-
 use {
 	::clap::{Parser, Subcommand},
 	::hashbrown::HashMap,
@@ -66,8 +64,7 @@ fn main() {
 		if let Command::Convert = args.command {
 			let mut out = HtmlEmit {
 				write: String::new(),
-				section_level: 0,
-				code_block_format: Rc::new(|_, _, _, _| {}),
+				section_level: 1,
 			};
 
 			eprintln!("[emit] emitting...");

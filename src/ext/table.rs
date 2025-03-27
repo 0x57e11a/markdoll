@@ -123,7 +123,7 @@ pub mod table {
 
 	/// the tag
 	#[must_use]
-	pub fn tag() -> TagDefinition {
+	pub fn tag<Ctx: 'static>() -> TagDefinition {
 		TagDefinition {
 			key: "table",
 			parse: |doll, args, text, tag_span| {
@@ -187,18 +187,18 @@ pub mod table {
 
 				Some(Box::new(table))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html),
+			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html(
+	pub fn html<Ctx: 'static>(
 		doll: &mut MarkDoll,
-		to: &mut HtmlEmit,
+		to: &mut HtmlEmit<Ctx>,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
-		fn write_cell(doll: &mut MarkDoll, to: &mut HtmlEmit, cell: &mut Cell) {
+		fn write_cell<Ctx: 'static>(doll: &mut MarkDoll, to: &mut HtmlEmit<Ctx>, cell: &mut Cell) {
 			let kind = if cell.is_head { "th" } else { "td" };
 			to.write.push_str(&format!("<{kind}"));
 
@@ -283,7 +283,7 @@ pub mod tr {
 
 	/// the tag
 	#[must_use]
-	pub fn tag() -> TagDefinition {
+	pub fn tag<Ctx: 'static>() -> TagDefinition {
 		TagDefinition {
 			key: "tr",
 			parse: |doll, args, text, tag_span| {
@@ -334,7 +334,7 @@ pub mod tc {
 
 	/// the tag
 	#[must_use]
-	pub fn tag() -> TagDefinition {
+	pub fn tag<Ctx: 'static>() -> TagDefinition {
 		TagDefinition {
 			key: "tc",
 			parse: |doll, args, text, tag_span| {
@@ -360,6 +360,6 @@ pub mod tc {
 
 /// all of this module's tags
 #[must_use]
-pub fn tags() -> impl IntoIterator<Item = TagDefinition> {
-	[table::tag(), tr::tag(), tc::tag()]
+pub fn tags<Ctx: 'static>() -> impl IntoIterator<Item = TagDefinition> {
+	[table::tag::<Ctx>(), tr::tag::<Ctx>(), tc::tag::<Ctx>()]
 }

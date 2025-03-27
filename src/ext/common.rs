@@ -12,7 +12,7 @@ pub mod comment {
 
 	/// the tag
 	#[must_use]
-	pub fn tag() -> TagDefinition {
+	pub fn tag<Ctx: 'static>() -> TagDefinition {
 		TagDefinition {
 			key: "//",
 			parse: |_, _, _, _| None,
@@ -23,6 +23,6 @@ pub mod comment {
 
 /// all of this module's tags
 #[must_use]
-pub fn tags() -> impl IntoIterator<Item = TagDefinition> {
-	[comment::tag()]
+pub fn tags<Ctx: 'static>() -> impl IntoIterator<Item = TagDefinition> {
+	[comment::tag::<Ctx>()]
 }

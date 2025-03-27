@@ -35,7 +35,7 @@ pub mod link {
 
 	/// the tag
 	#[must_use]
-	pub fn tag() -> TagDefinition {
+	pub fn tag<Ctx: 'static>() -> TagDefinition {
 		TagDefinition {
 			key: "link",
 			parse: |doll, args, text, tag_span| {
@@ -51,14 +51,14 @@ pub mod link {
 					ast: doll.parse_embedded(text.into()),
 				}))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html),
+			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html(
+	pub fn html<Ctx: 'static>(
 		doll: &mut MarkDoll,
-		to: &mut HtmlEmit,
+		to: &mut HtmlEmit<Ctx>,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -102,7 +102,7 @@ pub mod image {
 
 	/// the tag
 	#[must_use]
-	pub fn tag() -> TagDefinition {
+	pub fn tag<Ctx: 'static>() -> TagDefinition {
 		TagDefinition {
 			key: "img",
 			parse: |doll, args, text, tag_span| {
@@ -118,14 +118,14 @@ pub mod image {
 					alt: text.into(),
 				}))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html),
+			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html(
+	pub fn html<Ctx: 'static>(
 		doll: &mut MarkDoll,
-		to: &mut HtmlEmit,
+		to: &mut HtmlEmit<Ctx>,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -151,16 +151,12 @@ pub mod image {
 /// # content
 ///
 /// markdoll
-///
-/// # implementation
-///
-/// when emitting to [`HtmlEmit`], defines the `ref-<id>` HTML id, replacing `<id>` with the `id` argument
 pub mod definition {
 	use super::*;
 
 	/// the tag
 	#[must_use]
-	pub fn tag() -> TagDefinition {
+	pub fn tag<Ctx: 'static>() -> TagDefinition {
 		TagDefinition {
 			key: "def",
 			parse: |doll, args, text, tag_span| {
@@ -176,14 +172,14 @@ pub mod definition {
 					ast: doll.parse_embedded(text.into()),
 				}))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html),
+			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html(
+	pub fn html<Ctx: 'static>(
 		doll: &mut MarkDoll,
-		to: &mut HtmlEmit,
+		to: &mut HtmlEmit<Ctx>,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -220,7 +216,7 @@ pub mod reference {
 
 	/// the tag
 	#[must_use]
-	pub fn tag() -> TagDefinition {
+	pub fn tag<Ctx: 'static>() -> TagDefinition {
 		TagDefinition {
 			key: "ref",
 			parse: |doll, args, text, tag_span| {
@@ -238,14 +234,14 @@ pub mod reference {
 
 				Some(Box::new(Span::from(href)))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html),
+			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html(
+	pub fn html<Ctx: 'static>(
 		doll: &mut MarkDoll,
-		to: &mut HtmlEmit,
+		to: &mut HtmlEmit<Ctx>,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -260,11 +256,11 @@ pub mod reference {
 
 /// all of this module's tags
 #[must_use]
-pub fn tags() -> impl IntoIterator<Item = TagDefinition> {
+pub fn tags<Ctx: 'static>() -> impl IntoIterator<Item = TagDefinition> {
 	[
-		link::tag(),
-		image::tag(),
-		definition::tag(),
-		reference::tag(),
+		link::tag::<Ctx>(),
+		image::tag::<Ctx>(),
+		definition::tag::<Ctx>(),
+		reference::tag::<Ctx>(),
 	]
 }

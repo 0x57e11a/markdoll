@@ -21,18 +21,18 @@ pub mod code {
 
 	/// the tag
 	#[must_use]
-	pub fn tag() -> TagDefinition {
+	pub fn tag<Ctx: 'static>() -> TagDefinition {
 		TagDefinition {
 			key: "code",
 			parse: |_, _, text, _| Some(Box::new(Span::from(text))),
-			emitters: Emitters::<TagEmitter>::new().with(html),
+			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html(
+	pub fn html<Ctx: 'static>(
 		doll: &mut MarkDoll,
-		to: &mut HtmlEmit,
+		to: &mut HtmlEmit<Ctx>,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -48,66 +48,47 @@ pub mod code {
 ///
 /// emits code blocks
 ///
-/// # arguments
-///
-/// - (optional) `lang`:\
-///   the language code to highlight (by default this isn't used, override the emitter to customize this)
-///
 /// # content
 ///
 /// anything
 pub mod codeblock {
 	use super::*;
 
-	/// represents the language and content
-	#[derive(Debug)]
-	pub struct Block {
-		/// the language
-		pub lang: Option<Span>,
-		/// the text
-		pub text: Span,
-	}
-
 	/// the tag
 	#[must_use]
-	pub fn tag() -> TagDefinition {
+	pub fn tag<Ctx: 'static>() -> TagDefinition {
 		TagDefinition {
 			key: "codeblock",
 			parse: |doll, args, text, tag_span| {
 				args! {
 					args;
 					doll, tag_span;
-
-					opt_args(lang);
 				};
 
-				Some(Box::new(Block {
-					lang: lang.map(Into::into),
-					text: text.into(),
-				}))
+				Some(Box::new(text))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html),
+			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html(
+	pub fn html<Ctx: 'static>(
 		doll: &mut MarkDoll,
-		to: &mut HtmlEmit,
+		to: &mut HtmlEmit<Ctx>,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
-		let code = content.downcast_ref::<Block>().unwrap();
+		let code = content.downcast_ref::<Span>().unwrap();
 
 		to.write.push_str(&format!(
 			"<div class='doll-code-block'><pre>{}</pre></div>",
-			&html_escape::encode_text(&*doll.spanner.lookup_span(code.text))
+			&html_escape::encode_safe(&*doll.spanner.lookup_span(*code))
 		));
 	}
 }
 
 /// all of this module's tags
 #[must_use]
-pub fn tags() -> impl IntoIterator<Item = TagDefinition> {
-	[code::tag(), codeblock::tag()]
+pub fn tags<Ctx: 'static>() -> impl IntoIterator<Item = TagDefinition> {
+	[code::tag::<Ctx>(), codeblock::tag::<Ctx>()]
 }

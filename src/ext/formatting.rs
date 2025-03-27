@@ -59,7 +59,7 @@ pub mod emphasis {
 
 	/// the tag
 	#[must_use]
-	pub fn tag() -> TagDefinition {
+	pub fn tag<Ctx: 'static>() -> TagDefinition {
 		TagDefinition {
 			key: "em",
 			parse: |doll, args, text, tag_span| {
@@ -80,14 +80,14 @@ pub mod emphasis {
 					ast: doll.parse_embedded(text.into()),
 				}))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html),
+			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html(
+	pub fn html<Ctx: 'static>(
 		doll: &mut MarkDoll,
-		to: &mut HtmlEmit,
+		to: &mut HtmlEmit<Ctx>,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -165,14 +165,16 @@ pub mod quote {
 
 	/// the content of the quote, and optionally a citation
 	#[derive(Debug)]
-	struct Quote {
+	pub struct Quote {
+		/// citation for this quote
 		pub cite: Option<AST>,
+		/// content
 		pub ast: AST,
 	}
 
 	/// the tag
 	#[must_use]
-	pub fn tag() -> TagDefinition {
+	pub fn tag<Ctx: 'static>() -> TagDefinition {
 		TagDefinition {
 			key: "quote",
 			parse: |doll, args, text, tag_span| {
@@ -188,14 +190,14 @@ pub mod quote {
 					ast: doll.parse_embedded(text.into()),
 				}))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html),
+			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html(
+	pub fn html<Ctx: 'static>(
 		doll: &mut MarkDoll,
-		to: &mut HtmlEmit,
+		to: &mut HtmlEmit<Ctx>,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -227,6 +229,6 @@ pub mod quote {
 
 /// all of this module's tags
 #[must_use]
-pub fn tags() -> impl IntoIterator<Item = TagDefinition> {
-	[emphasis::tag(), quote::tag()]
+pub fn tags<Ctx: 'static>() -> impl IntoIterator<Item = TagDefinition> {
+	[emphasis::tag::<Ctx>(), quote::tag::<Ctx>()]
 }
