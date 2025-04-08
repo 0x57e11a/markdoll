@@ -19,15 +19,20 @@ use {
 mod emitters;
 
 /// the parsing signature tags use
-pub type TagParser = fn(
-	doll: &mut MarkDoll,
+pub type TagParser<Ctx> = fn(
+	doll: &mut MarkDoll<Ctx>,
 	args: Vec<SrcSpan<MarkDollSrc>>,
 	text: SrcSpan<MarkDollSrc>,
 	tag_span: Span,
 ) -> Option<Box<dyn TagContent>>;
 /// the emitting signature tags use for a given `To`
-pub type TagEmitter<To = ()> =
-	fn(doll: &mut MarkDoll, to: &mut To, content: &mut Box<dyn TagContent>, tag_span: Span);
+pub type TagEmitter<Ctx, To = ()> = fn(
+	doll: &mut MarkDoll<Ctx>,
+	to: &mut To,
+	ctx: &mut Ctx,
+	content: &mut Box<dyn TagContent>,
+	tag_span: Span,
+);
 
 /// defines a tag name, how to parse its contents, and how to emit it
 #[derive(Debug, Clone)]
@@ -35,15 +40,15 @@ pub type TagEmitter<To = ()> =
 	clippy::type_complexity,
 	reason = "type is never mentioned outside of this struct, simple functions"
 )]
-pub struct TagDefinition {
+pub struct TagDefinition<Ctx> {
 	/// the tag key
 	pub key: &'static str,
 
 	/// parse the tag contents
-	pub parse: TagParser,
+	pub parse: TagParser<Ctx>,
 
 	/// emit the tag content
-	pub emitters: Emitters<TagEmitter>,
+	pub emitters: Emitters<TagEmitter<Ctx>>,
 }
 
 /// helper macro to parse arguments into variables
@@ -85,7 +90,7 @@ macro_rules! args {
 
 		for arg in args {
 			let (at, context) = doll.resolve_span(arg.into());
-			doll.diag($crate::ext::TagArgsDiagnostic::Unused {
+			doll.diag($crate::ext::TagInputDiagnostic::ExtraneousInput {
 				at,
 				context,
 			}.into());
@@ -123,18 +128,20 @@ macro_rules! args {
 						@if [$($arg_ty)?] {
 							let span = args.remove(0);
 							#[allow(irrefutable_let_patterns, reason = "macro")]
-							if let Ok(value) = span.parse::<$($arg_ty)?>() {
-								value
-							} else {
-								let (at, context) = doll.resolve_span(span.into());
-								doll.diag($crate::ext::TagArgsDiagnostic::InvalidArgument {
-									num: arg_i,
-									name: stringify!($arg),
-									at,
-									context,
-								}.into());
+							match span.parse::<$($arg_ty)?>() {
+								Ok(value) => value,
+								Err(reason) => {
+									let (at, context) = doll.resolve_span(span.into());
+									doll.diag($crate::ext::TagInputDiagnostic::InvalidArgument {
+										num: arg_i,
+										name: stringify!($arg),
+										reason: reason.to_string(),
+										at,
+										context,
+									}.into());
 
-								return None;
+									return None;
+								}
 							}
 						} else {
 							args.remove(0)
@@ -142,7 +149,7 @@ macro_rules! args {
 					}
 				} else {
 					let (at, context) = doll.resolve_span(*tag_span);
-					doll.diag($crate::ext::TagArgsDiagnostic::MissingArgument {
+					doll.diag($crate::ext::TagInputDiagnostic::MissingArgument {
 						num: arg_i,
 						name: stringify!($arg),
 						at,
@@ -164,7 +171,7 @@ macro_rules! args {
 								value
 							} else {
 								let (at, context) = doll.resolve_span(span.into());
-								doll.diag($crate::ext::TagArgsDiagnostic::InvalidArgument {
+								doll.diag($crate::ext::TagInputDiagnostic::InvalidArgument {
 									num: arg_i,
 									name: stringify!($opt_arg),
 									at,
@@ -203,17 +210,21 @@ macro_rules! args {
 												let span = arg.subspan((index as u32 + 1)..);
 												args! {
 													@if [$($prop_ty)?] {
-														if let Ok(value) = span.parse::<$($prop_ty)?>() {
-															$prop = Some(value);
-														} else {
-															let (at, context) = doll.resolve_span(span.into());
-															doll.diag($crate::ext::TagArgsDiagnostic::InvalidProperty {
-																name: stringify!($prop),
-																at,
-																context,
-															}.into());
+														match span.parse::<$($prop_ty)?>() {
+															Ok(value) => {
+																$prop = Some(value);
+															}
+															Err(reason) => {
+																let (at, context) = doll.resolve_span(span.into());
+																doll.diag($crate::ext::TagInputDiagnostic::InvalidProperty {
+																	name: stringify!($prop),
+																	reason: reason.to_string(),
+																	at,
+																	context,
+																}.into());
 
-															retain_ok = false;
+																retain_ok = false;
+															}
 														}
 													} else {
 														$prop = Some(span);
@@ -247,42 +258,64 @@ macro_rules! args {
 	{ @if [$($tok:ty)+] $true:tt else $false:tt } => { $true };
 }
 
+/// tag input diagnostic
 #[derive(Debug, ::thiserror::Error, ::miette::Diagnostic)]
-pub enum TagArgsDiagnostic {
+pub enum TagInputDiagnostic {
+	/// missing an argument
 	#[error("missing argument #{num} `{name}`")]
 	#[diagnostic(code(markdoll::tag::missing_arg))]
 	MissingArgument {
+		/// argument number
 		num: usize,
+		/// argument name
 		name: &'static str,
+		/// tag span
 		#[label]
 		at: SourceSpan,
+		/// context
 		#[label(collection)]
 		context: Vec<LabeledSpan>,
 	},
+	/// failed to parse an argument
 	#[error("invalid argument #{num} `{name}`")]
 	#[diagnostic(code(markdoll::tag::invalid_arg))]
 	InvalidArgument {
+		/// argument number
 		num: usize,
+		/// argument name
 		name: &'static str,
-		#[label("failed to parse")]
+		/// the reason it failed
+		reason: String,
+		/// argument span
+		#[label("failed to parse: {}", .reason)]
 		at: SourceSpan,
+		/// context
 		#[label(collection)]
 		context: Vec<LabeledSpan>,
 	},
+	/// failed to parse a property
 	#[error("invalid property `{name}`")]
 	#[diagnostic(code(markdoll::tag::invalid_prop))]
 	InvalidProperty {
+		/// property name
 		name: &'static str,
-		#[label("failed to parse")]
+		/// the reason it failed
+		reason: String,
+		/// property span
+		#[label("failed to parse: {}", .reason)]
 		at: SourceSpan,
+		/// context
 		#[label(collection)]
 		context: Vec<LabeledSpan>,
 	},
-	#[error("unused input")]
-	#[diagnostic(code(markdoll::tag::unused_input), severity(Warning))]
-	Unused {
-		#[label("this is ignored")]
+	/// unused input
+	#[error("tag does not use this input")]
+	#[diagnostic(code(markdoll::tag::unused_input), severity(warning))]
+	ExtraneousInput {
+		/// input span
+		#[label("extraneous input")]
 		at: SourceSpan,
+		/// context
 		#[label(collection)]
 		context: Vec<LabeledSpan>,
 	},

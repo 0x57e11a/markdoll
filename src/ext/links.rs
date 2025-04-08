@@ -35,7 +35,7 @@ pub mod link {
 
 	/// the tag
 	#[must_use]
-	pub fn tag<Ctx: 'static>() -> TagDefinition {
+	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
 		TagDefinition {
 			key: "link",
 			parse: |doll, args, text, tag_span| {
@@ -51,14 +51,15 @@ pub mod link {
 					ast: doll.parse_embedded(text.into()),
 				}))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
+			emitters: Emitters::<TagEmitter<Ctx>>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html<Ctx: 'static>(
-		doll: &mut MarkDoll,
-		to: &mut HtmlEmit<Ctx>,
+	pub fn html<Ctx>(
+		doll: &mut MarkDoll<Ctx>,
+		to: &mut HtmlEmit,
+		ctx: &mut Ctx,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -71,7 +72,7 @@ pub mod link {
 
 		let inline_block = link.ast.len() > 1;
 		for Spanned(_, item) in &mut link.ast {
-			item.emit(doll, to, inline_block);
+			item.emit(doll, to, ctx, inline_block);
 		}
 
 		to.write.push_str("</a>");
@@ -102,7 +103,7 @@ pub mod image {
 
 	/// the tag
 	#[must_use]
-	pub fn tag<Ctx: 'static>() -> TagDefinition {
+	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
 		TagDefinition {
 			key: "img",
 			parse: |doll, args, text, tag_span| {
@@ -118,14 +119,15 @@ pub mod image {
 					alt: text.into(),
 				}))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
+			emitters: Emitters::<TagEmitter<Ctx>>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html<Ctx: 'static>(
-		doll: &mut MarkDoll,
-		to: &mut HtmlEmit<Ctx>,
+	pub fn html<Ctx>(
+		doll: &mut MarkDoll<Ctx>,
+		to: &mut HtmlEmit,
+		_: &mut Ctx,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -156,7 +158,7 @@ pub mod definition {
 
 	/// the tag
 	#[must_use]
-	pub fn tag<Ctx: 'static>() -> TagDefinition {
+	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
 		TagDefinition {
 			key: "def",
 			parse: |doll, args, text, tag_span| {
@@ -172,14 +174,15 @@ pub mod definition {
 					ast: doll.parse_embedded(text.into()),
 				}))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
+			emitters: Emitters::<TagEmitter<Ctx>>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html<Ctx: 'static>(
-		doll: &mut MarkDoll,
-		to: &mut HtmlEmit<Ctx>,
+	pub fn html<Ctx>(
+		doll: &mut MarkDoll<Ctx>,
+		to: &mut HtmlEmit,
+		ctx: &mut Ctx,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -197,7 +200,7 @@ pub mod definition {
 			" <span class='doll-def-body'>"
 		});
 		for Spanned(_, item) in &mut link.ast {
-			item.emit(doll, to, inline_block);
+			item.emit(doll, to, ctx, inline_block);
 		}
 		to.write
 			.push_str(if inline_block { "</div>" } else { "</span>" });
@@ -219,7 +222,7 @@ pub mod anchor {
 
 	/// the tag
 	#[must_use]
-	pub fn tag<Ctx: 'static>() -> TagDefinition {
+	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
 		TagDefinition {
 			key: "anchor",
 			parse: |doll, args, _, tag_span| {
@@ -232,14 +235,15 @@ pub mod anchor {
 
 				Some(Box::new(Span::from(href)))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
+			emitters: Emitters::<TagEmitter<Ctx>>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html<Ctx: 'static>(
-		doll: &mut MarkDoll,
-		to: &mut HtmlEmit<Ctx>,
+	pub fn html<Ctx>(
+		doll: &mut MarkDoll<Ctx>,
+		to: &mut HtmlEmit,
+		_: &mut Ctx,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -269,7 +273,7 @@ pub mod reference {
 
 	/// the tag
 	#[must_use]
-	pub fn tag<Ctx: 'static>() -> TagDefinition {
+	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
 		TagDefinition {
 			key: "ref",
 			parse: |doll, args, text, tag_span| {
@@ -285,14 +289,15 @@ pub mod reference {
 					ast: doll.parse_embedded(text.into()),
 				}))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
+			emitters: Emitters::<TagEmitter<Ctx>>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html<Ctx: 'static>(
-		doll: &mut MarkDoll,
-		to: &mut HtmlEmit<Ctx>,
+	pub fn html<Ctx>(
+		doll: &mut MarkDoll<Ctx>,
+		to: &mut HtmlEmit,
+		ctx: &mut Ctx,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -305,7 +310,7 @@ pub mod reference {
 
 		let inline_block = link.ast.len() > 1;
 		for Spanned(_, item) in &mut link.ast {
-			item.emit(doll, to, inline_block);
+			item.emit(doll, to, ctx, inline_block);
 		}
 
 		to.write.push_str("]</sup></a>");
@@ -314,7 +319,7 @@ pub mod reference {
 
 /// all of this module's tags
 #[must_use]
-pub fn tags<Ctx: 'static>() -> impl IntoIterator<Item = TagDefinition> {
+pub fn tags<Ctx>() -> impl IntoIterator<Item = TagDefinition<Ctx>> {
 	[
 		link::tag::<Ctx>(),
 		image::tag::<Ctx>(),

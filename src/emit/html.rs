@@ -4,20 +4,18 @@ use {
 };
 
 /// emit to HTML
-#[derive(Default)]
-pub struct HtmlEmit<Ctx: 'static> {
+#[derive(Debug, Default)]
+pub struct HtmlEmit {
 	/// HTML buffer
 	pub write: String,
 	/// heading level, initialize this to 0
 	pub section_level: usize,
-	/// some user defined context
-	pub context: Ctx,
 }
 
-impl<Ctx: 'static> HtmlEmit<Ctx> {
-	pub const DEFAULT_EMITTERS: BuiltInEmitters<Self> = {
+impl HtmlEmit {
+	pub const fn default_emitters<Ctx>() -> BuiltInEmitters<Ctx, Self> {
 		BuiltInEmitters {
-			inline: |doll, to, segments, inline_block| {
+			inline: |doll, to, ctx, segments, inline_block| {
 				if inline_block {
 					to.write.push_str("<div class='doll-inline'>");
 				}
@@ -32,7 +30,7 @@ impl<Ctx: 'static> HtmlEmit<Ctx> {
 								&html_escape::encode_safe(text)
 							));
 						}
-						InlineItem::Tag(tag) => tag.emit(doll, to),
+						InlineItem::Tag(tag) => tag.emit(doll, to, ctx),
 					}
 				}
 
@@ -40,21 +38,21 @@ impl<Ctx: 'static> HtmlEmit<Ctx> {
 					to.write.push_str("</div>");
 				}
 			},
-			section: |doll, to, header, children| {
+			section: |doll, to, ctx, header, children| {
 				to.section_level += 1;
 
 				let level = to.section_level;
 				if level <= 6 {
 					to.write.push_str(&format!("<h{level}>"));
 
-					(doll.builtin_emitters.get().unwrap().inline)(doll, to, header, false);
+					(doll.builtin_emitters.get().unwrap().inline)(doll, to, ctx, header, false);
 
 					to.write.push_str(&format!("</h{level}>"));
 				} else {
 					to.write
 						.push_str(&format!("<div role='heading' aria-level='{level}'>",));
 
-					(doll.builtin_emitters.get().unwrap().inline)(doll, to, header, false);
+					(doll.builtin_emitters.get().unwrap().inline)(doll, to, ctx, header, false);
 
 					to.write.push_str("</div>");
 				}
@@ -64,14 +62,14 @@ impl<Ctx: 'static> HtmlEmit<Ctx> {
 				));
 
 				for Spanned(_, child) in children {
-					child.emit(doll, &mut *to, true);
+					child.emit(doll, to, ctx, true);
 				}
 
 				to.write.push_str("</section>");
 
 				to.section_level -= 1;
 			},
-			list: |doll, to, ordered, items| {
+			list: |doll, to, ctx, ordered, items| {
 				let kind = if ordered { "ol" } else { "ul" };
 				to.write.push_str(&format!("<{kind}>"));
 
@@ -80,7 +78,7 @@ impl<Ctx: 'static> HtmlEmit<Ctx> {
 
 					let inline_block = item.len() > 1;
 					for Spanned(_, child) in item {
-						child.emit(doll, &mut *to, inline_block);
+						child.emit(doll, to, ctx, inline_block);
 					}
 
 					to.write.push_str("</li>");
@@ -89,20 +87,11 @@ impl<Ctx: 'static> HtmlEmit<Ctx> {
 				to.write.push_str(&format!("</{kind}>"));
 			},
 		}
-	};
-}
-
-impl<Ctx: 'static> ::core::fmt::Debug for HtmlEmit<Ctx> {
-	fn fmt(&self, fmt: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-		fmt.debug_struct("HtmlEmit")
-			.field("write", &self.write)
-			.field("section_level", &self.section_level)
-			.finish()
 	}
 }
 
-impl<Ctx: 'static> From<HtmlEmit<Ctx>> for String {
-	fn from(html: HtmlEmit<Ctx>) -> String {
+impl From<HtmlEmit> for String {
+	fn from(html: HtmlEmit) -> String {
 		html.write
 	}
 }

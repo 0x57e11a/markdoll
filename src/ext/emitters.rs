@@ -69,7 +69,7 @@ impl<Variant: EmittersVariant> Emitters<Variant> {
 	}
 }
 
-/// provides a way for [Emitters] to be able to freely transform the variant type between its generic and specific types
+/// provides a way for [`Emitters`] to be able to freely transform the variant type between its generic and specific types
 #[doc(hidden)]
 pub unsafe trait EmittersVariant: Sized + Copy {
 	type Specific<T>: Copy;
@@ -79,8 +79,8 @@ pub unsafe trait EmittersVariant: Sized + Copy {
 	fn generic_to_specific<Target: 'static>(generic: Self) -> Self::Specific<Target>;
 }
 
-unsafe impl EmittersVariant for TagEmitter {
-	type Specific<Target> = TagEmitter<Target>;
+unsafe impl<Ctx> EmittersVariant for TagEmitter<Ctx> {
+	type Specific<Target> = TagEmitter<Ctx, Target>;
 
 	fn specific_to_generic<Target: 'static>(specific: Self::Specific<Target>) -> Self {
 		unsafe { transmute(specific) }
@@ -91,8 +91,8 @@ unsafe impl EmittersVariant for TagEmitter {
 	}
 }
 
-unsafe impl EmittersVariant for BuiltInEmitters<()> {
-	type Specific<Target> = BuiltInEmitters<Target>;
+unsafe impl<Ctx> EmittersVariant for BuiltInEmitters<Ctx> {
+	type Specific<Target> = BuiltInEmitters<Ctx, Target>;
 
 	fn specific_to_generic<Target: 'static>(specific: Self::Specific<Target>) -> Self {
 		unsafe { transmute(specific) }

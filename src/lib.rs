@@ -49,17 +49,43 @@ pub mod ext;
 /// syntax trees and parser
 pub mod tree;
 
+/// the metadata of this [`MarkDollSrc`], describing where it came from
 #[derive(Debug)]
 pub enum SourceMetadata {
-	File(String),
-	LineTag(Span),
-	BlockTag(TagDiagnosticTranslation),
-	TagArgument(Span),
+	/// this source originates from a file
+	File {
+		/// filename of the file
+		filename: String,
+		/// if applicable, the span that referenced this
+		referenced_from: Option<Span>,
+	},
+	/// the content of a line-tag
+	LineTag {
+		/// what this content is derived from
+		from: Span,
+		/// whether this content is "verbatim" (exactly matches what's in its containing source)
+		verbatim: bool,
+	},
+	/// the content of a block-tag
+	BlockTag {
+		/// translation
+		translation: TagDiagnosticTranslation,
+	},
+	/// argument of a tag
+	TagArgument {
+		/// what this argument is derived from
+		from: Span,
+		/// whether this argument is "verbatim" (exactly matches what's in its containing source)
+		verbatim: bool,
+	},
 }
 
+/// markdoll source
 #[derive(Debug)]
 pub struct MarkDollSrc {
+	/// metadata containing information about the source's origin
 	pub metadata: SourceMetadata,
+	/// contents of this source
 	pub source: String,
 }
 
@@ -70,31 +96,52 @@ impl BufferSource for MarkDollSrc {
 
 	fn name(&self) -> Option<&str> {
 		Some(match &self.metadata {
-			SourceMetadata::File(filename) => filename,
-			SourceMetadata::LineTag(_) => "<line tag>",
-			SourceMetadata::BlockTag(_) => "<block tag>",
-			SourceMetadata::TagArgument(_) => "<tag argument>",
+			SourceMetadata::File { filename, .. } => filename,
+			SourceMetadata::LineTag {
+				verbatim: false, ..
+			} => "<transformed line tag>",
+			SourceMetadata::LineTag { verbatim: true, .. } => "<verbatim line tag>",
+			SourceMetadata::BlockTag { .. } => "<block tag>",
+			SourceMetadata::TagArgument {
+				verbatim: false, ..
+			} => "<transformed tag argument>",
+			SourceMetadata::TagArgument { verbatim: true, .. } => "<verbatim tag argument>",
 		})
+	}
+}
+
+impl Default for MarkDollSrc {
+	fn default() -> Self {
+		Self {
+			metadata: SourceMetadata::File {
+				filename: "empty".to_string(),
+				referenced_from: None,
+			},
+			source: "".to_string(),
+		}
 	}
 }
 
 /// markdoll's main context
 #[derive(Debug)]
-pub struct MarkDoll {
+pub struct MarkDoll<Ctx> {
 	/// the tags registered
-	pub tags: HashMap<&'static str, TagDefinition>,
+	pub tags: HashMap<&'static str, TagDefinition<Ctx>>,
 
-	pub builtin_emitters: Emitters<BuiltInEmitters<()>>,
+	/// emitters for built-in items
+	pub builtin_emitters: Emitters<BuiltInEmitters<Ctx, ()>>,
 
 	/// whether the current operation is "ok"
 	///
 	/// this shouldn't really be set to `true` by anything except the language
 	pub ok: bool,
-	pub(crate) diagnostics: Vec<DiagnosticKind>,
+	/// diagnostics from the current document
+	pub diagnostics: Vec<DiagnosticKind>,
+	/// source-mapping
 	pub spanner: Spanner<MarkDollSrc>,
 }
 
-impl MarkDoll {
+impl<Ctx> MarkDoll<Ctx> {
 	/// construct an empty instance with no tags and the default [`BuiltInEmitters`]
 	#[must_use]
 	pub fn new() -> Self {
@@ -110,12 +157,12 @@ impl MarkDoll {
 	}
 
 	/// add a tag
-	pub fn add_tag(&mut self, tag: TagDefinition) {
+	pub fn add_tag(&mut self, tag: TagDefinition<Ctx>) {
 		self.tags.insert(tag.key, tag);
 	}
 
 	/// add multiple tags
-	pub fn add_tags(&mut self, tags: impl IntoIterator<Item = TagDefinition>) {
+	pub fn add_tags(&mut self, tags: impl IntoIterator<Item = TagDefinition<Ctx>>) {
 		for tag in tags {
 			self.add_tag(tag);
 		}
@@ -130,7 +177,7 @@ impl MarkDoll {
 	/// if the operation does not succeed, the [`AST`] may be in an incomplete/incorrect state
 	#[instrument(skip(self), level = Level::INFO)]
 	pub fn parse_embedded(&mut self, src: Span) -> AST {
-		let mut ctx = parser::Ctx::new(self, src);
+		let mut ctx = parser::ParseCtx::new(self, src);
 		let (ok, ast) = parser::parse(&mut ctx);
 		self.ok &= ok;
 		ast
@@ -142,12 +189,13 @@ impl MarkDoll {
 	/// - whether the operation was successful
 	/// - the diagnostics produced during the operation (may not be ampty on success)
 	/// - the frontmatter
-	/// - the [AST]
+	/// - the [`AST`]
 	#[instrument(skip(self), level = Level::INFO, ret)]
 	pub fn parse_document(
 		&mut self,
 		filename: String,
 		source: String,
+		referenced_from: Option<Span>,
 	) -> (bool, Vec<DiagnosticKind>, Option<String>, AST) {
 		// stash state
 		let old_ok = ::core::mem::replace(&mut self.ok, true);
@@ -155,10 +203,13 @@ impl MarkDoll {
 
 		// parse
 		let buf = self.spanner.add(|_| MarkDollSrc {
-			metadata: SourceMetadata::File(filename),
+			metadata: SourceMetadata::File {
+				filename,
+				referenced_from,
+			},
 			source,
 		});
-		let mut ctx = parser::Ctx::new(self, buf.span());
+		let mut ctx = parser::ParseCtx::new(self, buf.span());
 		let frontmatter = parser::frontmatter(&mut ctx);
 		let (ok, ast) = parser::parse(&mut ctx);
 
@@ -174,11 +225,12 @@ impl MarkDoll {
 	/// returns
 	/// - whether the operation was successful
 	/// - the diagnostics produced during the operation (may not be ampty on success)
-	#[instrument(skip(self), level = Level::INFO)]
+	#[instrument(skip(self, ctx), level = Level::INFO)]
 	pub fn emit<To: Debug + 'static>(
 		&mut self,
 		ast: &mut AST,
 		to: &mut To,
+		ctx: &mut Ctx,
 	) -> (bool, Vec<DiagnosticKind>) {
 		// stash state
 		let old_ok = ::core::mem::replace(&mut self.ok, true);
@@ -186,7 +238,7 @@ impl MarkDoll {
 
 		// emit
 		for Spanned(_, node) in ast {
-			node.emit(self, to, true);
+			node.emit(self, to, ctx, true);
 		}
 
 		// restore stash
@@ -198,7 +250,7 @@ impl MarkDoll {
 
 	/// finish a set of files and prepare to render diagnostics
 	///
-	/// returns the shared spanner to use with [Report::with_source_code](::miette::Report::with_source_code)
+	/// returns the shared spanner to use with [`Report::with_source_code`](::miette::Report::with_source_code)
 	pub fn finish(&mut self) -> Arc<Spanner<MarkDollSrc>> {
 		Arc::new(::core::mem::take(&mut self.spanner))
 	}
@@ -218,23 +270,66 @@ impl MarkDoll {
 
 	/// returns (outer, inner) span
 	#[instrument(skip(self), ret)]
-	pub fn resolve_span(&mut self, mut span: Span) -> (SourceSpan, Vec<LabeledSpan>) {
+	pub fn resolve_span(&self, mut span: Span) -> (SourceSpan, Vec<LabeledSpan>) {
 		let mut init = span;
 		let mut labels = Vec::new();
 
 		loop {
 			let file = &self.spanner.lookup_buf(span.start());
 			span = match &file.src.metadata {
-				SourceMetadata::File(_) => break,
-				SourceMetadata::TagArgument(new) | SourceMetadata::LineTag(new) => {
+				SourceMetadata::File {
+					referenced_from: None,
+					..
+				} => break,
+				SourceMetadata::File {
+					referenced_from: Some(ref_from),
+					..
+				} => {
 					labels.push(LabeledSpan::new_with_span(
-						Some("⇣ originates from".to_string()),
+						Some("referenced by".to_string()),
+						self.spanner.lookup_linear_index(ref_from.start())
+							..self.spanner.lookup_linear_index(ref_from.end()),
+					));
+					*ref_from
+				}
+				SourceMetadata::TagArgument {
+					from: new,
+					verbatim: true,
+				}
+				| SourceMetadata::LineTag {
+					from: new,
+					verbatim: true,
+				} => {
+					let final_span = (new.start() + span.start().pos).with_len(span.len());
+					if let Some(label) = labels.pop() {
+						labels.push(LabeledSpan::new_with_span(
+							label.label().map(ToString::to_string),
+							self.spanner.lookup_linear_index(final_span.start())
+								..self.spanner.lookup_linear_index(final_span.end()),
+						));
+					} else {
+						init = final_span
+					}
+					final_span
+				}
+				SourceMetadata::TagArgument {
+					from: new,
+					verbatim: false,
+				}
+				| SourceMetadata::LineTag {
+					from: new,
+					verbatim: false,
+				} => {
+					labels.push(LabeledSpan::new_with_span(
+						Some("from here".to_string()),
 						self.spanner.lookup_linear_index(new.start())
 							..self.spanner.lookup_linear_index(new.end()),
 					));
 					*new
 				}
-				SourceMetadata::BlockTag(trans) => {
+				SourceMetadata::BlockTag {
+					translation: trans, ..
+				} => {
 					let parent = trans.to_parent(&self.spanner, span);
 					if let Some(label) = labels.pop() {
 						labels.push(LabeledSpan::new_with_span(
@@ -259,7 +354,7 @@ impl MarkDoll {
 	}
 }
 
-impl Default for MarkDoll {
+impl<Ctx> Default for MarkDoll<Ctx> {
 	fn default() -> Self {
 		Self::new()
 	}

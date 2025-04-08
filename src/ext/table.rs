@@ -11,21 +11,28 @@ use {
 	::spanner::{Span, Spanned},
 };
 
+/// an error with tables
 #[derive(Debug, ::thiserror::Error, ::miette::Diagnostic)]
 pub enum TableDiagnostic {
+	/// the table contained something that was not a row
 	#[error("tables may only contain lists and `tr` tags")]
 	#[diagnostic(code(markdoll::ext::table::non_row))]
 	NonRow {
+		/// the offending syntax
 		#[label]
 		at: SourceSpan,
+		/// context
 		#[label(collection)]
 		context: Vec<LabeledSpan>,
 	},
+	/// the table row contained something that was not a cell
 	#[error("table rows may only contain lists and `tc` tags")]
 	#[diagnostic(code(markdoll::ext::table::non_cell))]
 	NonCell {
+		/// the offending syntax
 		#[label]
 		at: SourceSpan,
+		/// context
 		#[label(collection)]
 		context: Vec<LabeledSpan>,
 	},
@@ -62,9 +69,9 @@ pub struct Table {
 	pub body: Vec<Row>,
 }
 
-fn parse_row(doll: &mut MarkDoll, ast: AST) -> Vec<Cell> {
+fn parse_row<Ctx>(doll: &mut MarkDoll<Ctx>, ast: AST) -> Vec<Cell> {
 	#[track_caller]
-	fn fail(doll: &mut MarkDoll, span: Span) {
+	fn fail<Ctx>(doll: &mut MarkDoll<Ctx>, span: Span) {
 		let (at, context) = doll.resolve_span(span);
 		doll.diag(DiagnosticKind::Tag(Box::new(TableDiagnostic::NonCell {
 			at,
@@ -123,7 +130,7 @@ pub mod table {
 
 	/// the tag
 	#[must_use]
-	pub fn tag<Ctx: 'static>() -> TagDefinition {
+	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
 		TagDefinition {
 			key: "table",
 			parse: |doll, args, text, tag_span| {
@@ -133,7 +140,7 @@ pub mod table {
 				}
 
 				#[track_caller]
-				fn fail(doll: &mut MarkDoll, span: Span) {
+				fn fail<Ctx>(doll: &mut MarkDoll<Ctx>, span: Span) {
 					let (at, context) = doll.resolve_span(span);
 					doll.diag(DiagnosticKind::Tag(Box::new(TableDiagnostic::NonRow {
 						at,
@@ -187,18 +194,24 @@ pub mod table {
 
 				Some(Box::new(table))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
+			emitters: Emitters::<TagEmitter<Ctx>>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html<Ctx: 'static>(
-		doll: &mut MarkDoll,
-		to: &mut HtmlEmit<Ctx>,
+	pub fn html<Ctx>(
+		doll: &mut MarkDoll<Ctx>,
+		to: &mut HtmlEmit,
+		ctx: &mut Ctx,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
-		fn write_cell<Ctx: 'static>(doll: &mut MarkDoll, to: &mut HtmlEmit<Ctx>, cell: &mut Cell) {
+		fn write_cell<Ctx>(
+			doll: &mut MarkDoll<Ctx>,
+			to: &mut HtmlEmit,
+			ctx: &mut Ctx,
+			cell: &mut Cell,
+		) {
 			let kind = if cell.is_head { "th" } else { "td" };
 			to.write.push_str(&format!("<{kind}"));
 
@@ -213,7 +226,7 @@ pub mod table {
 
 			let inline_block = cell.ast.len() > 1;
 			for Spanned(_, content) in &mut cell.ast {
-				content.emit(doll, to, inline_block);
+				content.emit(doll, to, ctx, inline_block);
 			}
 
 			to.write.push_str(&format!("</{kind}>"));
@@ -230,7 +243,7 @@ pub mod table {
 				to.write.push_str("<tr>");
 
 				for cell in &mut row.cells {
-					write_cell(doll, to, cell);
+					write_cell(doll, to, ctx, cell);
 				}
 
 				to.write.push_str("</tr>");
@@ -246,7 +259,7 @@ pub mod table {
 				to.write.push_str("<tr>");
 
 				for cell in &mut row.cells {
-					write_cell(doll, to, cell);
+					write_cell(doll, to, ctx, cell);
 				}
 
 				to.write.push_str("</tr>");
@@ -283,7 +296,7 @@ pub mod tr {
 
 	/// the tag
 	#[must_use]
-	pub fn tag<Ctx: 'static>() -> TagDefinition {
+	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
 		TagDefinition {
 			key: "tr",
 			parse: |doll, args, text, tag_span| {
@@ -301,7 +314,7 @@ pub mod tr {
 					cells: parse_row(doll, ast),
 				}))
 			},
-			emitters: Emitters::<TagEmitter>::new(),
+			emitters: Emitters::<TagEmitter<Ctx>>::new(),
 		}
 	}
 }
@@ -334,7 +347,7 @@ pub mod tc {
 
 	/// the tag
 	#[must_use]
-	pub fn tag<Ctx: 'static>() -> TagDefinition {
+	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
 		TagDefinition {
 			key: "tc",
 			parse: |doll, args, text, tag_span| {
@@ -353,13 +366,13 @@ pub mod tc {
 					ast: doll.parse_embedded(text.into()),
 				}))
 			},
-			emitters: Emitters::<TagEmitter>::new(),
+			emitters: Emitters::<TagEmitter<Ctx>>::new(),
 		}
 	}
 }
 
 /// all of this module's tags
 #[must_use]
-pub fn tags<Ctx: 'static>() -> impl IntoIterator<Item = TagDefinition> {
+pub fn tags<Ctx>() -> impl IntoIterator<Item = TagDefinition<Ctx>> {
 	[table::tag::<Ctx>(), tr::tag::<Ctx>(), tc::tag::<Ctx>()]
 }

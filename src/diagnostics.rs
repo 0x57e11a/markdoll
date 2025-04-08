@@ -1,6 +1,6 @@
 use {
 	crate::{
-		emit::EmitDiagnostic, ext::TagArgsDiagnostic, tree::parser::LangDiagnostic, MarkDollSrc,
+		emit::EmitDiagnostic, ext::TagInputDiagnostic, tree::parser::LangDiagnostic, MarkDollSrc,
 	},
 	::miette::Diagnostic,
 	::spanner::{Loc, Span, Spanner},
@@ -8,8 +8,10 @@ use {
 	::tracing::{instrument, trace},
 };
 
+/// diagnostics
 #[derive(::thiserror::Error, ::miette::Diagnostic, Debug)]
 pub enum DiagnosticKind {
+	/// language diagnostic
 	#[error(transparent)]
 	#[diagnostic(transparent)]
 	Lang(
@@ -17,6 +19,7 @@ pub enum DiagnosticKind {
 		#[diagnostic_source]
 		LangDiagnostic,
 	),
+	/// emitting diagnostic
 	#[error(transparent)]
 	#[diagnostic(transparent)]
 	Emit(
@@ -24,13 +27,15 @@ pub enum DiagnosticKind {
 		#[diagnostic_source]
 		EmitDiagnostic,
 	),
+	/// tag input diagnostic
 	#[error(transparent)]
 	#[diagnostic(transparent)]
 	TagArgs(
 		#[from]
 		#[diagnostic_source]
-		TagArgsDiagnostic,
+		TagInputDiagnostic,
 	),
+	/// custom tag diagnostic
 	#[error(transparent)]
 	#[diagnostic(transparent)]
 	Tag(
@@ -40,15 +45,21 @@ pub enum DiagnosticKind {
 	),
 }
 
+/// keeps track of how block-tags should translate their content
 #[derive(Debug)]
-pub(crate) struct TagDiagnosticTranslation {
+pub struct TagDiagnosticTranslation {
+	/// span this tag content covers in the source that contains it
 	pub parent_span: Span,
+	/// content of the tag
 	pub span: Span,
+	/// for each line of tag's content, the location in the parent source where that line begins
 	pub lines_to_parent_line_starts: Mutex<Option<Vec<Loc>>>,
+	/// how many levels of indentation before the content
 	pub parent_indent: usize,
 }
 
 impl TagDiagnosticTranslation {
+	/// transform a span to its parent span
 	#[must_use]
 	#[instrument(skip(spanner), ret)]
 	pub fn to_parent(&self, spanner: &Spanner<MarkDollSrc>, span: Span) -> Span {

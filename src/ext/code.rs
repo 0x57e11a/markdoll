@@ -21,18 +21,19 @@ pub mod code {
 
 	/// the tag
 	#[must_use]
-	pub fn tag<Ctx: 'static>() -> TagDefinition {
+	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
 		TagDefinition {
 			key: "code",
 			parse: |_, _, text, _| Some(Box::new(Span::from(text))),
-			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
+			emitters: Emitters::<TagEmitter<Ctx>>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html<Ctx: 'static>(
-		doll: &mut MarkDoll,
-		to: &mut HtmlEmit<Ctx>,
+	pub fn html<Ctx>(
+		doll: &mut MarkDoll<Ctx>,
+		to: &mut HtmlEmit,
+		_: &mut Ctx,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -56,7 +57,7 @@ pub mod codeblock {
 
 	/// the tag
 	#[must_use]
-	pub fn tag<Ctx: 'static>() -> TagDefinition {
+	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
 		TagDefinition {
 			key: "codeblock",
 			parse: |doll, args, text, tag_span| {
@@ -67,14 +68,15 @@ pub mod codeblock {
 
 				Some(Box::new(text))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
+			emitters: Emitters::<TagEmitter<Ctx>>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html<Ctx: 'static>(
-		doll: &mut MarkDoll,
-		to: &mut HtmlEmit<Ctx>,
+	pub fn html<Ctx>(
+		doll: &mut MarkDoll<Ctx>,
+		to: &mut HtmlEmit,
+		_: &mut Ctx,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -89,6 +91,6 @@ pub mod codeblock {
 
 /// all of this module's tags
 #[must_use]
-pub fn tags<Ctx: 'static>() -> impl IntoIterator<Item = TagDefinition> {
+pub fn tags<Ctx>() -> impl IntoIterator<Item = TagDefinition<Ctx>> {
 	[code::tag::<Ctx>(), codeblock::tag::<Ctx>()]
 }

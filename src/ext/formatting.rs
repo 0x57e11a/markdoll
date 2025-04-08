@@ -59,7 +59,7 @@ pub mod emphasis {
 
 	/// the tag
 	#[must_use]
-	pub fn tag<Ctx: 'static>() -> TagDefinition {
+	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
 		TagDefinition {
 			key: "em",
 			parse: |doll, args, text, tag_span| {
@@ -80,14 +80,15 @@ pub mod emphasis {
 					ast: doll.parse_embedded(text.into()),
 				}))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
+			emitters: Emitters::<TagEmitter<Ctx>>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html<Ctx: 'static>(
-		doll: &mut MarkDoll,
-		to: &mut HtmlEmit<Ctx>,
+	pub fn html<Ctx>(
+		doll: &mut MarkDoll<Ctx>,
+		to: &mut HtmlEmit,
+		ctx: &mut Ctx,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -119,7 +120,7 @@ pub mod emphasis {
 
 		let inline_block = em.ast.len() > 1;
 		for Spanned(_, item) in &mut em.ast {
-			item.emit(doll, to, inline_block);
+			item.emit(doll, to, ctx, inline_block);
 		}
 
 		if em.quote {
@@ -174,7 +175,7 @@ pub mod quote {
 
 	/// the tag
 	#[must_use]
-	pub fn tag<Ctx: 'static>() -> TagDefinition {
+	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
 		TagDefinition {
 			key: "quote",
 			parse: |doll, args, text, tag_span| {
@@ -190,14 +191,15 @@ pub mod quote {
 					ast: doll.parse_embedded(text.into()),
 				}))
 			},
-			emitters: Emitters::<TagEmitter>::new().with(html::<Ctx>),
+			emitters: Emitters::<TagEmitter<Ctx>>::new().with(html::<Ctx>),
 		}
 	}
 
 	/// emit to html
-	pub fn html<Ctx: 'static>(
-		doll: &mut MarkDoll,
-		to: &mut HtmlEmit<Ctx>,
+	pub fn html<Ctx>(
+		doll: &mut MarkDoll<Ctx>,
+		to: &mut HtmlEmit,
+		ctx: &mut Ctx,
 		content: &mut Box<dyn TagContent>,
 		_: Span,
 	) {
@@ -210,7 +212,7 @@ pub mod quote {
 
 			let inline_block = cite.len() > 1;
 			for Spanned(_, item) in cite {
-				item.emit(doll, to, inline_block);
+				item.emit(doll, to, ctx, inline_block);
 			}
 
 			to.write.push_str("</figcaption>");
@@ -220,7 +222,7 @@ pub mod quote {
 
 		let inline_block = quote.ast.len() > 1;
 		for Spanned(_, item) in &mut quote.ast {
-			item.emit(doll, to, inline_block);
+			item.emit(doll, to, ctx, inline_block);
 		}
 
 		to.write.push_str("</blockquote></figure>");
@@ -229,6 +231,6 @@ pub mod quote {
 
 /// all of this module's tags
 #[must_use]
-pub fn tags<Ctx: 'static>() -> impl IntoIterator<Item = TagDefinition> {
+pub fn tags<Ctx>() -> impl IntoIterator<Item = TagDefinition<Ctx>> {
 	[emphasis::tag::<Ctx>(), quote::tag::<Ctx>()]
 }

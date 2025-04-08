@@ -12,32 +12,35 @@ pub mod html;
 
 /// defines the behavior of built in [`BlockItem`](crate::tree::BlockItem)s
 #[derive(Debug)]
-pub struct BuiltInEmitters<To> {
+pub struct BuiltInEmitters<Ctx, To = ()> {
 	/// how to emit [`BlockItem::Inline`](crate::tree::BlockItem::Inline)
 	pub inline: fn(
-		doll: &mut MarkDoll,
+		doll: &mut MarkDoll<Ctx>,
 		to: &mut To,
+		ctx: &mut Ctx,
 		segments: &mut [Spanned<InlineItem>],
 		inline_block: bool,
 	),
 	/// how to emit [`BlockItem::Section`](crate::tree::BlockItem::Section)
 	pub section: fn(
-		doll: &mut MarkDoll,
+		doll: &mut MarkDoll<Ctx>,
 		to: &mut To,
+		ctx: &mut Ctx,
 		header: &mut [Spanned<InlineItem>],
 		children: &mut AST,
 	),
 	/// how to emit [`BlockItem::List`](crate::tree::BlockItem::List)
-	pub list: fn(doll: &mut MarkDoll, to: &mut To, ordered: bool, items: &mut [AST]),
+	pub list:
+		fn(doll: &mut MarkDoll<Ctx>, to: &mut To, ctx: &mut Ctx, ordered: bool, items: &mut [AST]),
 }
 
-impl<T> Clone for BuiltInEmitters<T> {
+impl<To, Ctx> Clone for BuiltInEmitters<To, Ctx> {
 	fn clone(&self) -> Self {
 		*self
 	}
 }
 
-impl<T> Copy for BuiltInEmitters<T> {}
+impl<To, Ctx> Copy for BuiltInEmitters<To, Ctx> {}
 
 #[derive(::thiserror::Error, ::miette::Diagnostic, Debug)]
 pub enum EmitDiagnostic {

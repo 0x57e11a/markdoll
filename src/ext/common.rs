@@ -12,17 +12,17 @@ pub mod comment {
 
 	/// the tag
 	#[must_use]
-	pub fn tag<Ctx: 'static>() -> TagDefinition {
+	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
 		TagDefinition {
 			key: "//",
 			parse: |_, _, _, _| None,
-			emitters: Emitters::<TagEmitter>::new(),
+			emitters: Emitters::<TagEmitter<Ctx>>::new(),
 		}
 	}
 }
 
 /// all of this module's tags
 #[must_use]
-pub fn tags<Ctx: 'static>() -> impl IntoIterator<Item = TagDefinition> {
+pub fn tags<Ctx>() -> impl IntoIterator<Item = TagDefinition<Ctx>> {
 	[comment::tag::<Ctx>()]
 }

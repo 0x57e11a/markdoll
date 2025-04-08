@@ -288,15 +288,15 @@ struct StreamTransaction(Loc, EnteredSpan);
 		InlineItem::Tag(_) => "tag",
 	}).collect::<Vec<&'static str>>().join(", "),
 )]
-pub(crate) struct Ctx<'doll> {
-	doll: &'doll mut MarkDoll,
+pub(crate) struct ParseCtx<'doll, Ctx> {
+	doll: &'doll mut MarkDoll<Ctx>,
 	stream: Stream,
 	stack: Vec<Locd<StackPart>>,
 	inline: Vec<Spanned<InlineItem>>,
 }
 
-impl<'doll> Ctx<'doll> {
-	pub fn new(doll: &'doll mut MarkDoll, span: Span) -> Self {
+impl<'doll, Ctx> ParseCtx<'doll, Ctx> {
+	pub fn new(doll: &'doll mut MarkDoll<Ctx>, span: Span) -> Self {
 		let src_span = doll.spanner.lookup_span(span);
 		Self {
 			doll,
@@ -379,12 +379,14 @@ impl<'doll> Ctx<'doll> {
 					assert_eq!(text.pop().unwrap(), '\n');
 				}
 				let file = self.doll.spanner.add(|start| MarkDollSrc {
-					metadata: SourceMetadata::BlockTag(TagDiagnosticTranslation {
-						span: Span::new(start, start + text.len() as u32), // todo
-						lines_to_parent_line_starts: Mutex::new(None),
-						parent_span,
-						parent_indent: indent,
-					}),
+					metadata: SourceMetadata::BlockTag {
+						translation: TagDiagnosticTranslation {
+							span: Span::new(start, start + text.len() as u32), // todo
+							lines_to_parent_line_starts: Mutex::new(None),
+							parent_span,
+							parent_indent: indent,
+						},
+					},
 					source: text,
 				});
 
@@ -504,7 +506,7 @@ enum ParseResult<T = ()> {
 }
 
 #[instrument(name = "frontmatter", level = Level::DEBUG, ret)]
-pub fn frontmatter(ctx: &mut Ctx) -> Option<String> {
+pub fn frontmatter<Ctx>(ctx: &mut ParseCtx<Ctx>) -> Option<String> {
 	let tr = ctx.stream.tr();
 
 	trace!("attempting to eat starting dashes");
@@ -582,7 +584,7 @@ mod indent {
 
 	/// called before returning to normal parsing
 	#[instrument(name = "indent::resume_standard_parsing", level = Level::DEBUG, ret)]
-	fn resume_standard_parsing(ctx: &mut Ctx, indent_level: &mut usize) -> bool {
+	fn resume_standard_parsing<Ctx>(ctx: &mut ParseCtx<Ctx>, indent_level: &mut usize) -> bool {
 		let tr = ctx.stream.tr();
 		let start = ctx.stream.at;
 		if let 1.. = ctx.stream.eat_all(' ') {
@@ -622,7 +624,7 @@ mod indent {
 	///
 	/// `:pinched_hand::neocat_melt:`
 	#[instrument(name = "indent::squimsh_to", level = Level::WARN)]
-	fn squimsh_to(ctx: &mut Ctx, to: usize) {
+	fn squimsh_to<Ctx>(ctx: &mut ParseCtx<Ctx>, to: usize) {
 		trace!(ctx.stack.len = ctx.stack.len());
 		while ctx.stack_indent() > to {
 			if let Locd(start, StackPart::BlockTag { .. }) = ctx.stack.last().unwrap() {
@@ -654,7 +656,7 @@ mod indent {
 
 	/// more indentation than current
 	#[instrument(name = "indent::more", level = Level::DEBUG)]
-	fn more(ctx: &mut Ctx, indent: Spanned<IndentKind>) {
+	fn more<Ctx>(ctx: &mut ParseCtx<Ctx>, indent: Spanned<IndentKind>) {
 		ctx.flush_inline();
 
 		if indent.1 == IndentKind::Standard {
@@ -692,8 +694,8 @@ mod indent {
 
 	/// less indentation than current
 	#[instrument(name = "indent::less", level = Level::DEBUG)]
-	fn less(
-		ctx: &mut Ctx,
+	fn less<Ctx>(
+		ctx: &mut ParseCtx<Ctx>,
 		indent: Spanned<IndentKind>,
 		indent_level: usize,
 		last_significant: &mut bool,
@@ -758,7 +760,7 @@ mod indent {
 	}
 
 	#[instrument(name = "indent::parse", level = Level::DEBUG, ret)]
-	pub fn parse(ctx: &mut Ctx, last_significant: &mut bool) -> ParseResult<usize> {
+	pub fn parse<Ctx>(ctx: &mut ParseCtx<Ctx>, last_significant: &mut bool) -> ParseResult<usize> {
 		let mut indent_level = 0;
 
 		let tag_block_top = if let Locd(loc, StackPart::BlockTag { .. }) = ctx.stack.last().unwrap()
@@ -865,7 +867,7 @@ mod tag {
 
 	/// parse inline tag text
 	#[instrument(name = "tag::parse_inline_text", level = Level::DEBUG)]
-	fn parse_inline_text(ctx: &mut Ctx) -> Option<(Span, Loc)> {
+	fn parse_inline_text<Ctx>(ctx: &mut ParseCtx<Ctx>) -> Option<(Span, Loc)> {
 		let start = ctx.stream.lookahead_loc(1);
 		let mut text = String::with_capacity(32);
 		let mut bracket_stack: usize = 0;
@@ -973,14 +975,17 @@ mod tag {
 			}
 		}
 
+		let from = Span::new(
+			start.unwrap(), // unwrap here because lookahead
+			ctx.stream.lookahead_loc(0).unwrap(),
+		);
+		let verbatim = text == ctx.doll.spanner.lookup_src(from);
+
 		Some((
 			ctx.doll
 				.spanner
 				.add(|_| MarkDollSrc {
-					metadata: SourceMetadata::LineTag(Span::new(
-						start.unwrap(), // unwrap here because lookahead
-						ctx.stream.lookahead_loc(0).unwrap(),
-					)),
+					metadata: SourceMetadata::LineTag { from, verbatim },
 					source: text,
 				})
 				.span(),
@@ -990,8 +995,8 @@ mod tag {
 
 	/// transform tag text to actual content
 	#[instrument(name = "tag::transform_content", level = Level::DEBUG)]
-	pub fn transform_content(
-		ctx: &mut Ctx,
+	pub fn transform_content<Ctx>(
+		ctx: &mut ParseCtx<Ctx>,
 		tag: Span,
 		args: &[Span],
 		text: Span,
@@ -1013,7 +1018,7 @@ mod tag {
 	}
 
 	#[instrument(name = "tag::parse_arg", level = Level::DEBUG)]
-	fn parse_arg(ctx: &mut Ctx) -> ParseResult<Span> {
+	fn parse_arg<Ctx>(ctx: &mut ParseCtx<Ctx>) -> ParseResult<Span> {
 		let start = ctx.stream.lookahead_loc(0).unwrap();
 		let mut arg = String::new();
 		let mut paren_stack: usize = 0;
@@ -1111,14 +1116,14 @@ mod tag {
 			}
 		}
 
+		let from = Span::new(start + 1, ctx.stream.lookahead_loc(0).unwrap());
+		let verbatim = arg == ctx.doll.spanner.lookup_src(from);
+
 		ParseResult::Ok(
 			ctx.doll
 				.spanner
 				.add(|_| MarkDollSrc {
-					metadata: SourceMetadata::TagArgument(Span::new(
-						start,
-						ctx.stream.lookahead_loc(1).unwrap(),
-					)),
+					metadata: SourceMetadata::TagArgument { from, verbatim },
 					source: arg,
 				})
 				.span(),
@@ -1126,8 +1131,8 @@ mod tag {
 	}
 
 	#[instrument(name = "tag::parse_content", level = Level::DEBUG)]
-	fn parse_content(
-		ctx: &mut Ctx,
+	fn parse_content<Ctx>(
+		ctx: &mut ParseCtx<Ctx>,
 		tag_start: Loc,
 		name: Span,
 		args: Vec<Span>,
@@ -1232,7 +1237,7 @@ mod tag {
 	}
 
 	#[instrument(name = "tag::parse", level = Level::DEBUG, ret)]
-	pub fn parse(ctx: &mut Ctx, indent_level: usize) -> ParseResult {
+	pub fn parse<Ctx>(ctx: &mut ParseCtx<Ctx>, indent_level: usize) -> ParseResult {
 		let start = ctx.stream.lookahead_loc(0).unwrap();
 		let mut args = Vec::new();
 
@@ -1377,7 +1382,7 @@ mod tag {
 ///
 /// if any error diagnostics are emitted
 #[allow(clippy::too_many_lines, reason = "its not that big")]
-pub(crate) fn parse(ctx: &mut Ctx) -> (bool, AST) {
+pub(crate) fn parse<Ctx>(ctx: &mut ParseCtx<Ctx>) -> (bool, AST) {
 	// significance tracks functionally-empty lines, splitting paragraphs at functionally-empty lines
 	let mut last_significant = false;
 
@@ -1497,12 +1502,14 @@ pub(crate) fn parse(ctx: &mut Ctx) -> (bool, AST) {
 										}
 
 										Some('\n') => {
-											ctx.inline.push(InlineItem::Text(text).spanned(
-												Span::new(
-													start,
-													ctx.stream.lookahead_loc(-2).unwrap(),
-												),
-											));
+											if !text.is_empty() {
+												ctx.inline.push(InlineItem::Text(text).spanned(
+													Span::new(
+														start,
+														ctx.stream.lookahead_loc(-2).unwrap(),
+													),
+												));
+											}
 											ctx.inline.push(
 												InlineItem::Break.spanned(
 													ctx.stream

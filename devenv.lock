@@ -3,10 +3,10 @@
     "devenv": {
       "locked": {
         "dir": "src/modules",
-        "lastModified": 1737908954,
+        "lastModified": 1738414267,
         "owner": "cachix",
         "repo": "devenv",
-        "rev": "52448c52aa63ebdae05dc08fcc2a112911ac7886",
+        "rev": "3f49b4afbb9a80b1e81fb6071f59dac152177efa",
         "type": "github"
       },
       "original": {
@@ -24,10 +24,10 @@
         "rust-analyzer-src": "rust-analyzer-src"
       },
       "locked": {
-        "lastModified": 1737873155,
+        "lastModified": 1738737274,
         "owner": "nix-community",
         "repo": "fenix",
-        "rev": "11391594600c119f02b3ee864decca1d6767f1b6",
+        "rev": "f82de9980822f3b1efcf54944939b1d514386827",
         "type": "github"
       },
       "original": {
@@ -118,10 +118,10 @@
     "rust-analyzer-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1737831834,
+        "lastModified": 1738698211,
         "owner": "rust-lang",
         "repo": "rust-analyzer",
-        "rev": "90bf50c0112db1494233401b6c0f895fb3210ddd",
+        "rev": "6fb64beb807b07dc687fd0f00261c7c404a83947",
         "type": "github"
       },
       "original": {

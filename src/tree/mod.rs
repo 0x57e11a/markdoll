@@ -27,14 +27,14 @@ pub struct TagInvocation {
 
 impl TagInvocation {
 	/// emit into an output
-	pub fn emit<To: 'static>(&mut self, doll: &mut MarkDoll, to: &mut To) {
+	pub fn emit<Ctx, To: 'static>(&mut self, doll: &mut MarkDoll<Ctx>, to: &mut To, ctx: &mut Ctx) {
 		let def = doll
 			.tags
 			.get(&*doll.spanner.lookup_span(self.name))
 			.expect("tag not defined, this should've been handled by the parser");
 
 		match def.emitters.get::<To>() {
-			Some(emit) => emit(doll, to, &mut self.content, self.name),
+			Some(emit) => emit(doll, to, ctx, &mut self.content, self.name),
 			None => {
 				let acceptable = AcceptableTagEmitTargets(def.emitters.type_names().collect());
 				let (at, context) = doll.resolve_span(self.name);
@@ -71,7 +71,7 @@ pub enum BlockItem {
 	/// inline items
 	Inline(Vec<Spanned<InlineItem>>),
 
-	/// a section, containing a numerical level, heading content, and body
+	/// a section, heading content and body
 	Section {
 		/// heading text
 		header: Vec<Spanned<InlineItem>>,
@@ -90,7 +90,13 @@ pub enum BlockItem {
 
 impl BlockItem {
 	/// emit into an output
-	pub fn emit<To: 'static>(&mut self, doll: &mut MarkDoll, to: &mut To, inline_block: bool) {
+	pub fn emit<Ctx, To: 'static>(
+		&mut self,
+		doll: &mut MarkDoll<Ctx>,
+		to: &mut To,
+		ctx: &mut Ctx,
+		inline_block: bool,
+	) {
 		let builtin_emitters = doll
 			.builtin_emitters
 			.get::<To>()
@@ -98,17 +104,17 @@ impl BlockItem {
 
 		match self {
 			Self::Inline(segments) => {
-				(builtin_emitters.inline)(doll, to, segments, inline_block);
+				(builtin_emitters.inline)(doll, to, ctx, segments, inline_block);
 			}
 			Self::Section {
 				header: name,
 				children,
 				..
 			} => {
-				(builtin_emitters.section)(doll, to, name, children);
+				(builtin_emitters.section)(doll, to, ctx, name, children);
 			}
 			Self::List { ordered, items, .. } => {
-				(builtin_emitters.list)(doll, to, *ordered, &mut items[..]);
+				(builtin_emitters.list)(doll, to, ctx, *ordered, &mut items[..]);
 			}
 		}
 	}
