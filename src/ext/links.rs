@@ -141,6 +141,53 @@ pub mod image {
 	}
 }
 
+/// `anchor` tag
+///
+/// define an anchor to be used with the [`anchor`](REF_TAG) tag
+///
+/// # arguments
+///
+/// - `id`\
+///   the id that `ref` tags should use
+pub mod anchor {
+	use super::*;
+
+	/// the tag
+	#[must_use]
+	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
+		TagDefinition {
+			key: "anchor",
+			parse: |doll, args, _, tag_span| {
+				args! {
+					args;
+					doll, tag_span;
+
+					args(href);
+				};
+
+				Some(Box::new(Span::from(href)))
+			},
+			emitters: Emitters::<TagEmitter<Ctx>>::new().with(html::<Ctx>),
+		}
+	}
+
+	/// emit to html
+	pub fn html<Ctx>(
+		doll: &mut MarkDoll<Ctx>,
+		to: &mut HtmlEmit,
+		_: &mut Ctx,
+		content: &mut Box<dyn TagContent>,
+		_: Span,
+	) {
+		let href = content.downcast_ref::<Span>().unwrap();
+
+		to.write.push_str(&format!(
+			"<span class='doll-def' id='{href}'></span>",
+			href = &html_escape::encode_safe(&*doll.spanner.lookup_span(*href))
+		));
+	}
+}
+
 /// `def` tag
 ///
 /// define an anchor to be used with the [`ref`](REF_TAG) tag
@@ -206,53 +253,6 @@ pub mod definition {
 			.push_str(if inline_block { "</div>" } else { "</span>" });
 
 		to.write.push_str("</span>");
-	}
-}
-
-/// `anchor` tag
-///
-/// define an anchor to be used with the [`anchor`](REF_TAG) tag
-///
-/// # arguments
-///
-/// - `id`\
-///   the id that `ref` tags should use
-pub mod anchor {
-	use super::*;
-
-	/// the tag
-	#[must_use]
-	pub fn tag<Ctx>() -> TagDefinition<Ctx> {
-		TagDefinition {
-			key: "anchor",
-			parse: |doll, args, _, tag_span| {
-				args! {
-					args;
-					doll, tag_span;
-
-					args(href);
-				};
-
-				Some(Box::new(Span::from(href)))
-			},
-			emitters: Emitters::<TagEmitter<Ctx>>::new().with(html::<Ctx>),
-		}
-	}
-
-	/// emit to html
-	pub fn html<Ctx>(
-		doll: &mut MarkDoll<Ctx>,
-		to: &mut HtmlEmit,
-		_: &mut Ctx,
-		content: &mut Box<dyn TagContent>,
-		_: Span,
-	) {
-		let href = content.downcast_ref::<Span>().unwrap();
-
-		to.write.push_str(&format!(
-			"<span class='doll-def' id='{href}'></span>",
-			href = &html_escape::encode_safe(&*doll.spanner.lookup_span(*href))
-		));
 	}
 }
 
