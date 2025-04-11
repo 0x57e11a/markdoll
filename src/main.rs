@@ -51,12 +51,12 @@ fn main() {
 	doll.add_tags(ext::code::tags());
 	doll.add_tags(ext::links::tags());
 	doll.add_tags(ext::table::tags());
-	doll.builtin_emitters.put(HtmlEmit::DEFAULT_EMITTERS);
+	doll.builtin_emitters.put(HtmlEmit::default_emitters());
 
 	eprintln!("[parse] parsing...");
 
 	let (mut ok, mut diagnostics, frontmatter, mut ast) =
-		doll.parse_document("stdin".to_string(), src);
+		doll.parse_document("stdin".to_string(), src, None);
 
 	if ok {
 		eprintln!("[parse] complete!");
@@ -69,7 +69,7 @@ fn main() {
 
 			eprintln!("[emit] emitting...");
 
-			let (emit_ok, mut emit_diagnostics) = doll.emit(&mut ast, &mut out);
+			let (emit_ok, mut emit_diagnostics) = doll.emit(&mut ast, &mut out, &mut ());
 			diagnostics.append(&mut emit_diagnostics);
 
 			if ok {
