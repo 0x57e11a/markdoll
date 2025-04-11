@@ -1,5 +1,6 @@
 use {
 	crate::{emit::BuiltInEmitters, tree::InlineItem},
+	::core::fmt::Write,
 	::spanner::Spanned,
 };
 
@@ -25,10 +26,8 @@ impl HtmlEmit {
 						InlineItem::Split => to.write.push(' '),
 						InlineItem::Break => to.write.push_str("<br />"),
 						InlineItem::Text(text) => {
-							to.write.push_str(&format!(
-								"<span>{}</span>",
-								&html_escape::encode_safe(text)
-							));
+							write!(to.write, "<span>{}</span>", &html_escape::encode_safe(text))
+								.unwrap();
 						}
 						InlineItem::Tag(tag) => tag.emit(doll, to, ctx),
 					}
@@ -43,23 +42,24 @@ impl HtmlEmit {
 
 				let level = to.section_level;
 				if level <= 6 {
-					to.write.push_str(&format!("<h{level}>"));
+					write!(to.write, "<h{level}>").unwrap();
 
 					(doll.builtin_emitters.get().unwrap().inline)(doll, to, ctx, header, false);
 
-					to.write.push_str(&format!("</h{level}>"));
+					write!(to.write, "</h{level}>").unwrap();
 				} else {
-					to.write
-						.push_str(&format!("<div role='heading' aria-level='{level}'>",));
+					write!(to.write, "<div role='heading' aria-level='{level}'>",).unwrap();
 
 					(doll.builtin_emitters.get().unwrap().inline)(doll, to, ctx, header, false);
 
 					to.write.push_str("</div>");
 				}
 
-				to.write.push_str(&format!(
+				write!(
+					to.write,
 					"<section class='doll-section' data-level='{level}'>"
-				));
+				)
+				.unwrap();
 
 				for Spanned(_, child) in children {
 					child.emit(doll, to, ctx, true);
@@ -71,7 +71,7 @@ impl HtmlEmit {
 			},
 			list: |doll, to, ctx, ordered, items| {
 				let kind = if ordered { "ol" } else { "ul" };
-				to.write.push_str(&format!("<{kind}>"));
+				write!(to.write, "<{kind}>").unwrap();
 
 				for item in items {
 					to.write.push_str("<li>");
@@ -84,7 +84,7 @@ impl HtmlEmit {
 					to.write.push_str("</li>");
 				}
 
-				to.write.push_str(&format!("</{kind}>"));
+				write!(to.write, "</{kind}>").unwrap();
 			},
 		}
 	}

@@ -56,7 +56,7 @@ pub struct TagDefinition<Ctx> {
 /// ```rs
 /// args! {
 ///     args; // pass the args
-/// 	doll, tag_span; // pass in the markdoll and args
+///     doll, tag_span; // pass in the markdoll and args
 ///
 ///     args(arg1, arg2: usize); // parse required arguments, which may be parsed into another type, if applicable. ex: `(2)`
 ///     opt_args(oarg1, oarg2: usize); // parse optional arguments, which will be `Some` when present (and parsed into another type, if applicable), or `None` if not. ex: `(2)`
@@ -207,7 +207,7 @@ macro_rules! args {
 									match &input[..index] {
 										$($(
 											stringify!($prop) => {
-												let span = arg.subspan((index as u32 + 1)..);
+												let span = arg.subspan((u32::try_from(index).unwrap() + 1)..);
 												args! {
 													@if [$($prop_ty)?] {
 														match span.parse::<$($prop_ty)?>() {
@@ -322,6 +322,7 @@ pub enum TagInputDiagnostic {
 }
 
 /// all the tags defined in the standard library
+#[must_use]
 pub fn all_tags<Ctx>() -> impl IntoIterator<Item = TagDefinition<Ctx>> {
 	code::tags()
 		.into_iter()

@@ -156,8 +156,9 @@ impl Stream {
 	}
 
 	#[allow(clippy::should_implement_trait, reason = "not bothering")]
+	#[allow(clippy::cast_possible_truncation, reason = "enforced already")]
 	pub fn next(&mut self) -> Option<char> {
-		if self.at - self.src.start() < self.src.len() as u32 {
+		if self.at - self.src.start() < self.src.len() {
 			let ch = self.lookahead(1);
 			self.at += ch.unwrap().len_utf8() as u32;
 			ch
@@ -204,13 +205,12 @@ impl Stream {
 
 		if n > 0 {
 			for _ in 0..n {
-				if offset >= self.src.len() as u32 {
+				if offset >= self.src.len() {
 					return None;
 				}
 
 				offset += 1;
-				while offset < self.src.len() as u32 && !self.src.is_char_boundary(offset as usize)
-				{
+				while offset < self.src.len() && !self.src.is_char_boundary(offset as usize) {
 					offset += 1;
 				}
 
@@ -238,6 +238,7 @@ impl Stream {
 		self.char_at(self.lookahead_loc(n)? - self.src.start())
 	}
 
+	#[allow(clippy::cast_possible_truncation, reason = "enforced already")]
 	pub fn span_of(&mut self, i: Loc) -> Span {
 		if let Some(ch) = self.char_at(i - self.src.start()) {
 			Span::new(i, i + ch.len_utf8() as u32)
@@ -259,13 +260,15 @@ impl Stream {
 	}
 
 	#[allow(clippy::unused_self, reason = "consistency")]
-	pub fn tr_commit(&mut self, _: StreamTransaction) {
+	pub fn tr_commit(&mut self, trans: StreamTransaction) {
 		trace!("committed transaction");
+		trans.1.exit();
 	}
 
 	pub fn tr_cancel(&mut self, trans: StreamTransaction) {
 		trace!(returning_to = ?trans.0, "canceled transaction");
 		self.at = trans.0;
+		trans.1.exit();
 	}
 }
 
@@ -334,6 +337,7 @@ impl<'doll, Ctx> ParseCtx<'doll, Ctx> {
 		count
 	}
 
+	#[allow(clippy::cast_possible_truncation, reason = "enforced already")]
 	#[instrument(name = "ctx.stack_terminate_top", level = Level::DEBUG)]
 	#[track_caller]
 	pub fn stack_terminate_top(&mut self) {
@@ -433,10 +437,10 @@ impl<'doll, Ctx> ParseCtx<'doll, Ctx> {
 		}
 
 		let mut inline = ::core::mem::take(&mut self.inline);
-		let span = if !inline.is_empty() {
-			inline.first().unwrap().0.union(&inline.last().unwrap().0)
-		} else {
+		let span = if inline.is_empty() {
 			return;
+		} else {
+			inline.first().unwrap().0.union(&inline.last().unwrap().0)
 		};
 
 		let Locd(_, top) = self.stack.last_mut().expect("empty parse stack");
@@ -469,10 +473,7 @@ impl<'doll, Ctx> ParseCtx<'doll, Ctx> {
 	#[instrument(level = Level::ERROR)]
 	pub fn crlf_explode(&mut self) {
 		let (primary, context) = self.doll.resolve_span(self.stream.lookahead_span(0));
-		self.diag(LangDiagnostic::CarriageReturn {
-			primary,
-			context: context,
-		});
+		self.diag(LangDiagnostic::CarriageReturn { primary, context });
 
 		self.stream.at = self.stream.src.end();
 	}
@@ -556,7 +557,7 @@ pub fn frontmatter<Ctx>(ctx: &mut ParseCtx<Ctx>) -> Option<String> {
 							));
 							ctx.diag(LangDiagnostic::Unexpected {
 								primary: at,
-								context: context,
+								context,
 								unexpected: "chars",
 								expected: &["newline"],
 							});
@@ -601,7 +602,7 @@ mod indent {
 		{
 			let stack_indent = ctx.stack_indent();
 			// and there's a closing bracket below its content indent
-			if *indent_level + 1 <= stack_indent && ctx.stream.try_eat(']') {
+			if *indent_level < stack_indent && ctx.stream.try_eat(']') {
 				// if the indent isnt exactly one level below its content indent
 				if *indent_level + 1 < stack_indent {
 					let (opened, _) = ctx.doll.resolve_span(ctx.stream.span_of(*start));
@@ -644,11 +645,11 @@ mod indent {
 				//ctx.flush_inline();
 
 				return;
-			} else {
-				ctx.flush_inline();
-				// gracefully terminate
-				ctx.stack_terminate_top();
 			}
+
+			ctx.flush_inline();
+			// gracefully terminate
+			ctx.stack_terminate_top();
 		}
 	}
 
@@ -776,7 +777,7 @@ mod indent {
 
 			match ctx.stream.lookahead(1) {
 				Some('\n') => {
-					if !tag_block_top.is_some() {
+					if tag_block_top.is_none() {
 						*last_significant = false;
 
 						trace!("flush insignificant");
@@ -1038,7 +1039,7 @@ mod tag {
 				}
 
 				Some('\\') => match ctx.stream.next() {
-					Some(ch @ '\n') | Some(ch @ '\t') => {
+					Some(ch @ ('\n' | '\t')) => {
 						let (primary, context) = ctx.doll.resolve_span(
 							ctx.stream
 								.lookahead_span(-1)
@@ -1259,7 +1260,7 @@ mod tag {
 						});
 					}
 
-					Some('(') | Some(':') | Some(']') => {
+					Some('(' | ':' | ']') => {
 						ctx.stream.back();
 						break ctx.stream.lookahead_loc(1).unwrap();
 					}
@@ -1328,11 +1329,8 @@ mod tag {
 						transform_content(ctx, name, &args, name.end().with_len(0))
 					{
 						ctx.inline.push(
-							InlineItem::Tag(TagInvocation {
-								name: name,
-								content,
-							})
-							.spanned(Span::new(start, ctx.stream.lookahead_loc(0).unwrap())),
+							InlineItem::Tag(TagInvocation { name, content })
+								.spanned(Span::new(start, ctx.stream.lookahead_loc(0).unwrap())),
 						);
 					}
 

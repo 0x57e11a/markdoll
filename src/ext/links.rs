@@ -6,6 +6,7 @@ use {
 		tree::{TagContent, AST},
 		MarkDoll,
 	},
+	::core::fmt::Write,
 	::spanner::{Span, Spanned},
 };
 
@@ -67,10 +68,12 @@ pub mod link {
 			.downcast_mut::<Link>()
 			.unwrap();
 
-		to.write.push_str(&format!(
+		write!(
+			to.write,
 			"<a href='{}'>",
 			&html_escape::encode_safe(&*doll.spanner.lookup_span(link.href))
-		));
+		)
+		.unwrap();
 
 		let inline_block = link.ast.len() > 1;
 		for Spanned(_, item) in &mut link.ast {
@@ -137,11 +140,13 @@ pub mod image {
 			.downcast_mut::<Image>()
 			.unwrap();
 
-		to.write.push_str(&format!(
+		write!(
+			to.write,
 			"<img src='{}' alt='{}' />",
 			&html_escape::encode_safe(&*doll.spanner.lookup_span(img.src)),
 			&html_escape::encode_safe(&*doll.spanner.lookup_span(img.alt))
-		));
+		)
+		.unwrap();
 	}
 }
 
@@ -187,10 +192,12 @@ pub mod anchor {
 			.downcast_ref::<Span>()
 			.unwrap();
 
-		to.write.push_str(&format!(
+		write!(
+			to.write,
 			"<span class='doll-def' id='{href}'></span>",
 			href = &html_escape::encode_safe(&*doll.spanner.lookup_span(*href))
-		));
+		)
+		.unwrap();
 	}
 }
 
@@ -243,10 +250,12 @@ pub mod definition {
 			.downcast_mut::<Link>()
 			.unwrap();
 
-		to.write.push_str(&format!(
+		write!(
+			to.write,
 			"<span class='doll-def' id='{href}'><span class='doll-def-header'>[{href}]:</span>",
 			href = &html_escape::encode_safe(&*doll.spanner.lookup_span(link.href))
-		));
+		)
+		.unwrap();
 
 		let inline_block = link.ast.len() > 1;
 		to.write.push_str(if inline_block {
@@ -313,10 +322,12 @@ pub mod reference {
 			.downcast_mut::<Link>()
 			.unwrap();
 
-		to.write.push_str(&format!(
+		write!(
+			to.write,
 			"<a href='#{}'><sup class='doll-ref'>[",
 			doll.spanner.lookup_span(link.href)
-		));
+		)
+		.unwrap();
 
 		let inline_block = link.ast.len() > 1;
 		for Spanned(_, item) in &mut link.ast {

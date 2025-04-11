@@ -31,18 +31,17 @@ impl TagInvocation {
 			.get(&*doll.spanner.lookup_span(self.name))
 			.expect("tag not defined, this should've been handled by the parser");
 
-		match def.emitters.get::<To>() {
-			Some(emit) => emit(doll, to, ctx, &mut self.content, self.name),
-			None => {
-				let acceptable = AcceptableTagEmitTargets(def.emitters.type_names().collect());
-				let (at, context) = doll.resolve_span(self.name);
-				doll.diag(DiagnosticKind::Emit(EmitDiagnostic::TagCannotEmitTo {
-					at,
-					context,
-					bad: ::core::any::type_name::<To>(),
-					acceptable,
-				}));
-			}
+		if let Some(emit) = def.emitters.get::<To>() {
+			emit(doll, to, ctx, &mut self.content, self.name);
+		} else {
+			let acceptable = AcceptableTagEmitTargets(def.emitters.type_names().collect());
+			let (at, context) = doll.resolve_span(self.name);
+			doll.diag(DiagnosticKind::Emit(EmitDiagnostic::TagCannotEmitTo {
+				at,
+				context,
+				bad: ::core::any::type_name::<To>(),
+				acceptable,
+			}));
 		}
 	}
 }

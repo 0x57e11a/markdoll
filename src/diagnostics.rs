@@ -60,8 +60,9 @@ pub struct TagDiagnosticTranslation {
 
 impl TagDiagnosticTranslation {
 	/// transform a span to its parent span
-	#[must_use]
+	#[allow(clippy::cast_possible_truncation, reason = "enforced already")]
 	#[instrument(skip(spanner), ret)]
+	#[must_use]
 	pub fn to_parent(&self, spanner: &Spanner<MarkDollSrc>, span: Span) -> Span {
 		let parent = spanner.lookup_buf(self.parent_span.start());
 		let child = spanner.lookup_buf(self.span.start());
@@ -111,12 +112,12 @@ impl TagDiagnosticTranslation {
 			{
 				let location = child.line_col(span.start());
 				trace!(?location, linestart = ?translations[location.line as usize], "start linecol");
-				translations[location.line as usize] + location.col as u32
+				translations[location.line as usize] + location.col
 			},
 			{
 				let location = child.line_col(span.end());
 				trace!(?location, lineend = ?translations[location.line as usize], "end linecol");
-				translations[location.line as usize] + location.col as u32
+				translations[location.line as usize] + location.col
 			},
 		)
 	}

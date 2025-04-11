@@ -34,13 +34,13 @@ pub struct BuiltInEmitters<Ctx, To = ()> {
 		fn(doll: &mut MarkDoll<Ctx>, to: &mut To, ctx: &mut Ctx, ordered: bool, items: &mut [AST]),
 }
 
-impl<To, Ctx> Clone for BuiltInEmitters<To, Ctx> {
+impl<Ctx, To> Clone for BuiltInEmitters<Ctx, To> {
 	fn clone(&self) -> Self {
 		*self
 	}
 }
 
-impl<To, Ctx> Copy for BuiltInEmitters<To, Ctx> {}
+impl<Ctx, To> Copy for BuiltInEmitters<Ctx, To> {}
 
 #[derive(::thiserror::Error, ::miette::Diagnostic, Debug)]
 pub enum EmitDiagnostic {
@@ -63,10 +63,10 @@ pub struct AcceptableTagEmitTargets(pub Vec<&'static str>);
 
 impl Display for AcceptableTagEmitTargets {
 	fn fmt(&self, fmt: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-		if !self.0.is_empty() {
-			write!(fmt, "tag supports emission to:\n{}", self.0.join("\n"))
-		} else {
+		if self.0.is_empty() {
 			write!(fmt, "this tag cannot be emitted to any targets")
+		} else {
+			write!(fmt, "tag supports emission to:\n{}", self.0.join("\n"))
 		}
 	}
 }

@@ -117,7 +117,7 @@ impl Default for MarkDollSrc {
 				filename: "empty".to_string(),
 				referenced_from: None,
 			},
-			source: "".to_string(),
+			source: String::new(),
 		}
 	}
 }
@@ -199,7 +199,7 @@ impl<Ctx> MarkDoll<Ctx> {
 	) -> (bool, Vec<DiagnosticKind>, Option<String>, AST) {
 		// stash state
 		let old_ok = ::core::mem::replace(&mut self.ok, true);
-		let old_diagnostics = ::core::mem::replace(&mut self.diagnostics, Vec::new());
+		let old_diagnostics = ::core::mem::take(&mut self.diagnostics);
 
 		// parse
 		let buf = self.spanner.add(|_| MarkDollSrc {
@@ -234,7 +234,7 @@ impl<Ctx> MarkDoll<Ctx> {
 	) -> (bool, Vec<DiagnosticKind>) {
 		// stash state
 		let old_ok = ::core::mem::replace(&mut self.ok, true);
-		let old_diagnostics = ::core::mem::replace(&mut self.diagnostics, Vec::new());
+		let old_diagnostics = ::core::mem::take(&mut self.diagnostics);
 
 		// emit
 		for Spanned(_, node) in ast {
@@ -308,7 +308,7 @@ impl<Ctx> MarkDoll<Ctx> {
 								..self.spanner.lookup_linear_index(final_span.end()),
 						));
 					} else {
-						init = final_span
+						init = final_span;
 					}
 					final_span
 				}
@@ -338,7 +338,7 @@ impl<Ctx> MarkDoll<Ctx> {
 								..self.spanner.lookup_linear_index(parent.end()),
 						));
 					} else {
-						init = parent
+						init = parent;
 					}
 					parent
 				}

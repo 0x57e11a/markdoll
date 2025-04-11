@@ -12,6 +12,7 @@ pub struct Emitters<Variant: EmittersVariant> {
 
 impl<Variant: EmittersVariant> Emitters<Variant> {
 	/// create a new typemap
+	#[must_use]
 	pub fn new() -> Self {
 		Self {
 			inner: HashMap::with_capacity(1),
@@ -30,6 +31,7 @@ impl<Variant: EmittersVariant> Emitters<Variant> {
 	}
 
 	/// put an emitter into the map
+	#[must_use]
 	pub fn with<Target: 'static>(mut self, value: Variant::Specific<Target>) -> Self {
 		self.put(value);
 		self
@@ -63,7 +65,6 @@ impl<Variant: EmittersVariant> Emitters<Variant> {
 	}
 
 	/// the names of the types that have values in this map
-	#[must_use]
 	pub fn type_names(&self) -> impl Iterator<Item = &'static str> + use<'_, Variant> {
 		self.inner.values().map(|value| value.1)
 	}

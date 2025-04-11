@@ -6,6 +6,7 @@ use {
 		tree::TagContent,
 		MarkDoll,
 	},
+	::core::fmt::Write,
 	::spanner::Span,
 };
 
@@ -37,14 +38,16 @@ pub mod code {
 		content: &mut dyn TagContent,
 		_: Span,
 	) {
-		to.write.push_str(&format!(
+		write!(
+			to.write,
 			"<code>{}</code>",
 			doll.spanner.lookup_span(
 				*(content as &mut dyn ::core::any::Any)
 					.downcast_ref::<Span>()
 					.unwrap()
 			)
-		));
+		)
+		.unwrap();
 	}
 }
 
@@ -87,10 +90,12 @@ pub mod codeblock {
 			.downcast_ref::<Span>()
 			.unwrap();
 
-		to.write.push_str(&format!(
+		write!(
+			to.write,
 			"<div class='doll-code-block'><pre>{}</pre></div>",
 			&html_escape::encode_safe(&*doll.spanner.lookup_span(*code))
-		));
+		)
+		.unwrap();
 	}
 }
 

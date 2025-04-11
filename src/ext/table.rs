@@ -7,6 +7,7 @@ use {
 		tree::{BlockItem, InlineItem, TagContent, TagInvocation, AST},
 		MarkDoll,
 	},
+	::core::fmt::Write,
 	::miette::{LabeledSpan, SourceSpan},
 	::spanner::{Span, Spanned},
 };
@@ -136,11 +137,6 @@ pub mod table {
 		TagDefinition {
 			key: "table",
 			parse: |doll, args, text, tag_span| {
-				args! {
-					args;
-					doll, tag_span;
-				}
-
 				#[track_caller]
 				fn fail<Ctx>(doll: &mut MarkDoll<Ctx>, span: Span) {
 					let (at, context) = doll.resolve_span(span);
@@ -148,6 +144,11 @@ pub mod table {
 						at,
 						context,
 					})));
+				}
+
+				args! {
+					args;
+					doll, tag_span;
 				}
 
 				let mut table = Table {
@@ -217,13 +218,13 @@ pub mod table {
 			cell: &mut Cell,
 		) {
 			let kind = if cell.is_head { "th" } else { "td" };
-			to.write.push_str(&format!("<{kind}"));
+			write!(to.write, "<{kind}").unwrap();
 
 			if cell.rows != 1 {
-				to.write.push_str(&format!(" rowspan='{}'", cell.rows));
+				write!(to.write, " rowspan='{}'", cell.rows).unwrap();
 			}
 			if cell.cols != 1 {
-				to.write.push_str(&format!(" colspan='{}'", cell.cols));
+				write!(to.write, " colspan='{}'", cell.cols).unwrap();
 			}
 
 			to.write.push('>');
@@ -233,7 +234,7 @@ pub mod table {
 				content.emit(doll, to, ctx, inline_block);
 			}
 
-			to.write.push_str(&format!("</{kind}>"));
+			write!(to.write, "</{kind}>").unwrap();
 		}
 
 		let table = (content as &mut dyn ::core::any::Any)

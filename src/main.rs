@@ -1,14 +1,9 @@
 use {
 	::clap::{Parser, Subcommand},
-	::hashbrown::HashMap,
-	::markdoll::{
-		diagnostics,
-		emit::{html::HtmlEmit, BuiltInEmitters},
-		ext, MarkDoll,
-	},
-	::miette::{miette, Diagnostic, LabeledSpan, Report, SourceCode},
-	::std::{io::Read, rc::Rc},
-	::tracing::{error_span, trace, trace_span},
+	::markdoll::{emit::html::HtmlEmit, ext, MarkDoll},
+	::miette::Report,
+	::std::io::Read,
+	::tracing::error_span,
 };
 
 #[derive(Parser, Debug)]
@@ -51,8 +46,7 @@ fn main() {
 
 	eprintln!("[parse] parsing...");
 
-	let (mut ok, mut diagnostics, frontmatter, mut ast) =
-		doll.parse_document("stdin".to_string(), src, None);
+	let (mut ok, mut diagnostics, _, mut ast) = doll.parse_document("stdin".to_string(), src, None);
 
 	if ok {
 		eprintln!("[parse] complete!");
@@ -68,7 +62,7 @@ fn main() {
 			let (emit_ok, mut emit_diagnostics) = doll.emit(&mut ast, &mut out, &mut ());
 			diagnostics.append(&mut emit_diagnostics);
 
-			if ok {
+			if emit_ok {
 				eprintln!("[emit] complete!");
 				eprintln!("[emit] writing output to stdout...");
 
@@ -91,7 +85,7 @@ fn main() {
 	let mut reports = Vec::new();
 
 	for diagnostic in diagnostics {
-		let traced = error_span!("diagnostic", ?diagnostic).entered();
+		let _traced = error_span!("diagnostic", ?diagnostic).entered();
 
 		let report = Report::from(diagnostic).with_source_code(source.clone());
 		reports.push(format!("{report:?}"));
