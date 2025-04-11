@@ -66,7 +66,7 @@ pub mod codeblock {
 					doll, tag_span;
 				};
 
-				Some(Box::new(text))
+				Some(Box::new(text.span()))
 			},
 			emitters: Emitters::<TagEmitter<Ctx>>::new().with(html::<Ctx>),
 		}
