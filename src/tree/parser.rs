@@ -584,7 +584,7 @@ mod indent {
 
 	/// called before returning to normal parsing
 	#[instrument(name = "indent::resume_standard_parsing", level = Level::DEBUG, ret)]
-	fn resume_standard_parsing<Ctx>(ctx: &mut ParseCtx<Ctx>, indent_level: &mut usize) -> bool {
+	fn resume_standard_parsing<Ctx>(ctx: &mut ParseCtx<Ctx>, indent_level: &mut usize) {
 		let tr = ctx.stream.tr();
 		let start = ctx.stream.at;
 		if let 1.. = ctx.stream.eat_all(' ') {
@@ -616,8 +616,6 @@ mod indent {
 
 		// squish down to the indent level
 		squimsh_to(ctx, *indent_level);
-
-		true
 	}
 
 	/// squish stack parts down to the provided indent level
@@ -792,12 +790,9 @@ mod indent {
 				Some(ch @ ('\t' | '=' | '-')) => {
 					// if not just plain indent, need to eat the indent after it (or dont eat anything if no indent after it)
 					if ch != '\t' {
-						if !matches!(ctx.stream.lookahead(2), Some('\t' | '\n')) {
-							if !resume_standard_parsing(ctx, &mut indent_level) {
-								return ParseResult::NextLine;
-							}
-
-							break;
+						if !matches!(ctx.stream.lookahead(2), Some('\t')) {
+							resume_standard_parsing(ctx, &mut indent_level);
+							return ParseResult::Ok(indent_level);
 						}
 
 						ctx.stream.skip();
@@ -845,13 +840,9 @@ mod indent {
 						ctx.crlf_explode();
 					}
 
-					if !resume_standard_parsing(ctx, &mut indent_level) {
-						return ParseResult::NextLine;
-					}
-
+					resume_standard_parsing(ctx, &mut indent_level);
 					*last_significant = true;
-
-					break;
+					return ParseResult::Ok(indent_level);
 				}
 
 				None => return ParseResult::Stop,
