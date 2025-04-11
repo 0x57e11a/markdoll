@@ -10,11 +10,9 @@ use {
 };
 
 /// tag content, effectively just [`Any`](core::any::Any) with [`Debug`](core::fmt::Debug)
-pub trait TagContent: ::downcast_rs::Downcast + ::core::fmt::Debug {}
+pub trait TagContent: ::core::any::Any + ::core::fmt::Debug {}
 
-impl<T: ::downcast_rs::Downcast + ::core::fmt::Debug> TagContent for T {}
-
-::downcast_rs::impl_downcast!(TagContent);
+impl<T: ::core::any::Any + ::core::fmt::Debug> TagContent for T {}
 
 /// an invoked tag
 #[derive(Debug)]

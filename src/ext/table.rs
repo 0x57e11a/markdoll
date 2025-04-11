@@ -88,7 +88,9 @@ fn parse_row<Ctx>(doll: &mut MarkDoll<Ctx>, ast: AST) -> Vec<Cell> {
 					match item {
 						InlineItem::Split | InlineItem::Break => {}
 						InlineItem::Tag(TagInvocation { content, .. }) => {
-							if let Ok(cell) = content.downcast::<Cell>() {
+							if let Ok(cell) =
+								(content as Box<dyn ::core::any::Any>).downcast::<Cell>()
+							{
 								cells.push(*cell);
 							} else {
 								fail(doll, span);
@@ -160,7 +162,9 @@ pub mod table {
 								match item {
 									InlineItem::Split | InlineItem::Break => {}
 									InlineItem::Tag(TagInvocation { content, .. }) => {
-										if let Ok(row) = content.downcast::<Row>() {
+										if let Ok(row) =
+											(content as Box<dyn ::core::any::Any>).downcast::<Row>()
+										{
 											if row.is_head {
 												table.head.push(*row);
 											} else {
@@ -203,7 +207,7 @@ pub mod table {
 		doll: &mut MarkDoll<Ctx>,
 		to: &mut HtmlEmit,
 		ctx: &mut Ctx,
-		content: &mut Box<dyn TagContent>,
+		content: &mut dyn TagContent,
 		_: Span,
 	) {
 		fn write_cell<Ctx>(
@@ -232,7 +236,9 @@ pub mod table {
 			to.write.push_str(&format!("</{kind}>"));
 		}
 
-		let table = content.downcast_mut::<Table>().unwrap();
+		let table = (content as &mut dyn ::core::any::Any)
+			.downcast_mut::<Table>()
+			.unwrap();
 
 		to.write.push_str("<div class='doll-table'><table>");
 

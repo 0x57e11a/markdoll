@@ -60,10 +60,12 @@ pub mod link {
 		doll: &mut MarkDoll<Ctx>,
 		to: &mut HtmlEmit,
 		ctx: &mut Ctx,
-		content: &mut Box<dyn TagContent>,
+		content: &mut dyn TagContent,
 		_: Span,
 	) {
-		let link = content.downcast_mut::<Link>().unwrap();
+		let link = (content as &mut dyn ::core::any::Any)
+			.downcast_mut::<Link>()
+			.unwrap();
 
 		to.write.push_str(&format!(
 			"<a href='{}'>",
@@ -128,10 +130,12 @@ pub mod image {
 		doll: &mut MarkDoll<Ctx>,
 		to: &mut HtmlEmit,
 		_: &mut Ctx,
-		content: &mut Box<dyn TagContent>,
+		content: &mut dyn TagContent,
 		_: Span,
 	) {
-		let img = content.downcast_mut::<Image>().unwrap();
+		let img = (content as &mut dyn ::core::any::Any)
+			.downcast_mut::<Image>()
+			.unwrap();
 
 		to.write.push_str(&format!(
 			"<img src='{}' alt='{}' />",
@@ -176,10 +180,12 @@ pub mod anchor {
 		doll: &mut MarkDoll<Ctx>,
 		to: &mut HtmlEmit,
 		_: &mut Ctx,
-		content: &mut Box<dyn TagContent>,
+		content: &mut dyn TagContent,
 		_: Span,
 	) {
-		let href = content.downcast_ref::<Span>().unwrap();
+		let href = (content as &mut dyn ::core::any::Any)
+			.downcast_ref::<Span>()
+			.unwrap();
 
 		to.write.push_str(&format!(
 			"<span class='doll-def' id='{href}'></span>",
@@ -230,10 +236,12 @@ pub mod definition {
 		doll: &mut MarkDoll<Ctx>,
 		to: &mut HtmlEmit,
 		ctx: &mut Ctx,
-		content: &mut Box<dyn TagContent>,
+		content: &mut dyn TagContent,
 		_: Span,
 	) {
-		let link = content.downcast_mut::<Link>().unwrap();
+		let link = (content as &mut dyn ::core::any::Any)
+			.downcast_mut::<Link>()
+			.unwrap();
 
 		to.write.push_str(&format!(
 			"<span class='doll-def' id='{href}'><span class='doll-def-header'>[{href}]:</span>",
@@ -298,10 +306,12 @@ pub mod reference {
 		doll: &mut MarkDoll<Ctx>,
 		to: &mut HtmlEmit,
 		ctx: &mut Ctx,
-		content: &mut Box<dyn TagContent>,
+		content: &mut dyn TagContent,
 		_: Span,
 	) {
-		let link = content.downcast_mut::<Link>().unwrap();
+		let link = (content as &mut dyn ::core::any::Any)
+			.downcast_mut::<Link>()
+			.unwrap();
 
 		to.write.push_str(&format!(
 			"<a href='#{}'><sup class='doll-ref'>[",

@@ -30,7 +30,7 @@ pub type TagEmitter<Ctx, To = ()> = fn(
 	doll: &mut MarkDoll<Ctx>,
 	to: &mut To,
 	ctx: &mut Ctx,
-	content: &mut Box<dyn TagContent>,
+	content: &mut dyn TagContent,
 	tag_span: Span,
 );
 

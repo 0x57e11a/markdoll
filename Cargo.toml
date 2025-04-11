@@ -6,30 +6,27 @@ edition = "2021"
 description = "a structured and extensible markup language"
 readme = "README.md"
 repository = "https://codeberg.org/0x57e11a/markdoll"
-rust-version = "1.81"
+rust-version = "1.86"
 license = "MIT"
 keywords = ["markup"]
 categories = ["compilers", "no-std", "parser-implementations", "visualization"]
 
 [dependencies]
 html-escape = "0.2.13"
-downcast-rs = "1.2.1"
 tracing = "0.1"
 tyfling = "0.1.1"
-miette = "7.4.0"
-thiserror = "2.0.6"
+miette = { version = "7.5.0", features = ["fancy"] }
+thiserror = "2.0.12"
 spanner = { path = "../spanner", features = ["miette"] }
 hashbrown = "0.15.2"
+clap = { version = "4.5.35", features = ["derive"] }
 
-clap = { version = "4.5.17", features = ["derive"], optional = true }
 tracing-subscriber = { version = "0.3.19", optional = true }
 tracing-fancytree = { version = "0.1.0", optional = true }
 
 [features]
 default = []
-cli = ["dep:clap", "miette/fancy"]
 cli-trace = ["dep:tracing-subscriber", "dep:tracing-fancytree"]
 
 [[bin]]
 name = "markdoll"
-required-features = ["cli"]

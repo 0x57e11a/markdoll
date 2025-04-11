@@ -34,13 +34,16 @@ pub mod code {
 		doll: &mut MarkDoll<Ctx>,
 		to: &mut HtmlEmit,
 		_: &mut Ctx,
-		content: &mut Box<dyn TagContent>,
+		content: &mut dyn TagContent,
 		_: Span,
 	) {
 		to.write.push_str(&format!(
 			"<code>{}</code>",
-			doll.spanner
-				.lookup_span(*content.downcast_ref::<Span>().unwrap())
+			doll.spanner.lookup_span(
+				*(content as &mut dyn ::core::any::Any)
+					.downcast_ref::<Span>()
+					.unwrap()
+			)
 		));
 	}
 }
@@ -77,10 +80,12 @@ pub mod codeblock {
 		doll: &mut MarkDoll<Ctx>,
 		to: &mut HtmlEmit,
 		_: &mut Ctx,
-		content: &mut Box<dyn TagContent>,
+		content: &mut dyn TagContent,
 		_: Span,
 	) {
-		let code = content.downcast_ref::<Span>().unwrap();
+		let code = (content as &mut dyn ::core::any::Any)
+			.downcast_ref::<Span>()
+			.unwrap();
 
 		to.write.push_str(&format!(
 			"<div class='doll-code-block'><pre>{}</pre></div>",

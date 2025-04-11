@@ -89,10 +89,12 @@ pub mod emphasis {
 		doll: &mut MarkDoll<Ctx>,
 		to: &mut HtmlEmit,
 		ctx: &mut Ctx,
-		content: &mut Box<dyn TagContent>,
+		content: &mut dyn TagContent,
 		_: Span,
 	) {
-		let em = content.downcast_mut::<Emphasis>().unwrap();
+		let em = (content as &mut dyn ::core::any::Any)
+			.downcast_mut::<Emphasis>()
+			.unwrap();
 
 		if em.italic {
 			to.write.push_str("<em>");
@@ -200,10 +202,12 @@ pub mod quote {
 		doll: &mut MarkDoll<Ctx>,
 		to: &mut HtmlEmit,
 		ctx: &mut Ctx,
-		content: &mut Box<dyn TagContent>,
+		content: &mut dyn TagContent,
 		_: Span,
 	) {
-		let quote = content.downcast_mut::<Quote>().unwrap();
+		let quote = (content as &mut dyn ::core::any::Any)
+			.downcast_mut::<Quote>()
+			.unwrap();
 
 		to.write.push_str("<figure class='doll-quote'>");
 

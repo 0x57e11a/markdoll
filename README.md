@@ -10,9 +10,9 @@ to get an idea of the syntax, [visit the repository](https://codeberg.org/0x57e1
 
 ## cargo features
 
-- `ariadne`
-  allows fancy diagnostic printing, requires `std`
+- `cli-trace`
+  print tracing information for the cli
 
 ## minimum supported rust version
 
-this library requires features from rust 1.81
+this library requires features from rust 1.86
