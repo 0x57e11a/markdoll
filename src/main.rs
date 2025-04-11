@@ -46,11 +46,7 @@ fn main() {
 		.expect("failed to read stdin");
 
 	let mut doll = MarkDoll::new();
-	doll.add_tags(ext::common::tags());
-	doll.add_tags(ext::formatting::tags());
-	doll.add_tags(ext::code::tags());
-	doll.add_tags(ext::links::tags());
-	doll.add_tags(ext::table::tags());
+	doll.add_tags(ext::all_tags());
 	doll.builtin_emitters.put(HtmlEmit::default_emitters());
 
 	eprintln!("[parse] parsing...");

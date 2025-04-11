@@ -320,3 +320,13 @@ pub enum TagInputDiagnostic {
 		context: Vec<LabeledSpan>,
 	},
 }
+
+/// all the tags defined in the standard library
+pub fn all_tags<Ctx>() -> impl IntoIterator<Item = TagDefinition<Ctx>> {
+	code::tags()
+		.into_iter()
+		.chain(common::tags())
+		.chain(formatting::tags())
+		.chain(links::tags())
+		.chain(table::tags())
+}
