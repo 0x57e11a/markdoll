@@ -124,7 +124,7 @@ impl Default for MarkDollSrc {
 
 /// markdoll's main context
 #[derive(Debug)]
-pub struct MarkDoll<Ctx> {
+pub struct MarkDoll<Ctx = ()> {
 	/// the tags registered
 	pub tags: HashMap<&'static str, TagDefinition<Ctx>>,
 
