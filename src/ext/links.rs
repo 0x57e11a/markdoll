@@ -324,16 +324,18 @@ pub mod reference {
 			.downcast_mut::<Link>()
 			.unwrap();
 
-		write!(
-			to.write,
-			"<a href='#{}'><sup class='doll-ref'>[",
-			doll.spanner.lookup_span(link.href)
-		)
-		.unwrap();
+		let id = doll.spanner.lookup_span(link.href);
+		let id = ::html_escape::encode_safe(&*id);
 
-		let inline_block = link.ast.len() > 1;
-		for Spanned(_, item) in &mut link.ast {
-			item.emit(doll, to, ctx, inline_block);
+		write!(to.write, "<a href='#{id}'><sup class='doll-ref'>[").unwrap();
+
+		if link.ast.is_empty() {
+			to.write.push_str(&id);
+		} else {
+			let inline_block = link.ast.len() > 1;
+			for Spanned(_, item) in &mut link.ast {
+				item.emit(doll, to, ctx, inline_block);
+			}
 		}
 
 		to.write.push_str("]</sup></a>");
