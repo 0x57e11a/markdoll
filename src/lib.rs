@@ -40,13 +40,9 @@ use {
 };
 pub use {::miette, ::spanner, ::thiserror};
 
-/// emitting/translating diagnostics
 pub mod diagnostics;
-/// emitting output and default [`BuiltInEmitters`]
 pub mod emit;
-/// the extension system and standard library
 pub mod ext;
-/// syntax trees and parser
 pub mod tree;
 
 /// the metadata of this [`MarkDollSrc`], describing where it came from

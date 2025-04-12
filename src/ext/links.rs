@@ -1,3 +1,5 @@
+//! `link`/`image`/`anchor`/`def`/`ref` tags
+
 use {
 	crate::{
 		args,

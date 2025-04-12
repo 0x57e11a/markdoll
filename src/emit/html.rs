@@ -1,3 +1,5 @@
+//! the html emit target
+
 use {
 	crate::{emit::BuiltInEmitters, tree::InlineItem},
 	::core::fmt::Write,
@@ -14,6 +16,8 @@ pub struct HtmlEmit {
 }
 
 impl HtmlEmit {
+	/// the default emitters for html
+	#[must_use]
 	pub const fn default_emitters<Ctx>() -> BuiltInEmitters<Ctx, Self> {
 		BuiltInEmitters {
 			inline: |doll, to, ctx, segments, inline_block| {

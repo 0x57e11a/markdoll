@@ -1,12 +1,9 @@
-/// `code`/`codeblock` tags
+//! the extension system and standard library
+
 pub mod code;
-/// `//` tag
 pub mod common;
-/// `em`/`quote` tags
 pub mod formatting;
-/// `link`/`def`/`ref` tags
 pub mod links;
-/// `table`/`tr`/`tc` tags
 pub mod table;
 
 pub use emitters::Emitters;

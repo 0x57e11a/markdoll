@@ -1,3 +1,5 @@
+//! `table`/`tr`/`tc` tags
+
 use {
 	crate::{
 		args,

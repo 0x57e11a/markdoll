@@ -1,3 +1,5 @@
+//! `//` tags
+
 use crate::ext::{Emitters, TagDefinition, TagEmitter};
 
 /// `//` tag

@@ -1,3 +1,5 @@
+//! relevant types for diagnostics and translating them to their respective source locations
+
 use {
 	crate::{
 		emit::EmitDiagnostic, ext::TagInputDiagnostic, tree::parser::LangDiagnostic, MarkDollSrc,
@@ -19,14 +21,6 @@ pub enum DiagnosticKind {
 		#[diagnostic_source]
 		LangDiagnostic,
 	),
-	/// emitting diagnostic
-	#[error(transparent)]
-	#[diagnostic(transparent)]
-	Emit(
-		#[from]
-		#[diagnostic_source]
-		EmitDiagnostic,
-	),
 	/// tag input diagnostic
 	#[error(transparent)]
 	#[diagnostic(transparent)]
@@ -34,6 +28,14 @@ pub enum DiagnosticKind {
 		#[from]
 		#[diagnostic_source]
 		TagInputDiagnostic,
+	),
+	/// emitting diagnostic
+	#[error(transparent)]
+	#[diagnostic(transparent)]
+	Emit(
+		#[from]
+		#[diagnostic_source]
+		EmitDiagnostic,
 	),
 	/// custom tag diagnostic
 	#[error(transparent)]

@@ -1,3 +1,5 @@
+//! `code`/`codeblock` tags
+
 use {
 	crate::{
 		args,

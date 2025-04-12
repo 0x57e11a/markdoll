@@ -1,3 +1,5 @@
+//! syntax trees and parsing
+
 pub(crate) mod parser;
 
 use {

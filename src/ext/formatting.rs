@@ -1,3 +1,5 @@
+//! `em`/`quote` tags
+
 use {
 	crate::{
 		args,
