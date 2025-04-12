@@ -327,7 +327,7 @@ pub mod reference {
 		let id = doll.spanner.lookup_span(link.href);
 		let id = ::html_escape::encode_safe(&*id);
 
-		write!(to.write, "<a href='#{id}'><sup class='doll-ref'>[").unwrap();
+		write!(to.write, "<sup class='doll-ref'><a href='#{id}'>[").unwrap();
 
 		if link.ast.is_empty() {
 			to.write.push_str(&id);
@@ -338,7 +338,7 @@ pub mod reference {
 			}
 		}
 
-		to.write.push_str("]</sup></a>");
+		to.write.push_str("]</a></sup>");
 	}
 }
 
