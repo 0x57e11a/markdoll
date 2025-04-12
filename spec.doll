@@ -2,391 +2,344 @@
 awawa!
 ---
 
-&markdoll
-	this is markdoll
+this is markdoll
 
-	markdoll is an extensible markup language written in rust, made: by dolls, for dolls
+markdoll is an extensible markup language written in rust, made: by dolls, for dolls
 
-	&how is it different from other markup languages?
-		like HTML, markdoll is a tree shaped system. for example, headers always precede sections,
-		which have a defined ending point, an explicit hierarchy, rather than an implicit one
-	&specification
-		&whitespace
-			in markdoll, tab characters are significant, they help define sections and lists, and provide a boundary for block-content tags
+&how is it different from other markup languages?
+	like HTML, markdoll is a tree shaped system. for example, headers always precede sections,
+	which have a defined ending point, an explicit hierarchy, rather than an implicit one
+&specification
+	&whitespace
+		in markdoll, tab characters are significant, they help define sections and lists, and provide a boundary for block-content tags
 
-			markdoll specifically does [em:not] assign importance to spaces, but does prohibit them in certain cases
+		markdoll specifically does [em:not] assign importance to spaces, but does prohibit them in certain cases
 
-			newlines are also very signficant:
+		newlines are also very signficant:
 
-			-	unless the last character of the line is a backslash ([code:\\]), splitting text by a newline instead inserts a space
-			-	separating text/tags by an empty line splits it into two paragraphs
-			-	separating list elements by an empty line splits it into two lists
+		-	unless the last character of the line is a backslash ([code:\\]), splitting text by a newline instead inserts a space
+		-	separating text/tags by an empty line splits it into two paragraphs
+		-	separating list elements by an empty line splits it into two lists
 
-			[em(h):do note that all .doll files must be LF, CR characters will cause a fatal parsing error]
-		&tags
-			markdoll has a concept of "tags", which have a keyword and may choose to have arguments and content
+		[em(h):do note that all .doll files must be LF, CR characters will cause a fatal parsing error]
+	&tags
+		markdoll has a concept of "tags", which have a keyword and may choose to have arguments and content
 
-			tags can be written multiple ways:
-			[table::
-				=	=	kind
-					=	syntax
-					=	result
+		tags can be written multiple ways:
+		[table::
+			=	=	kind
+				=	syntax
+				=	result
 
-				-	=	no-arg & no-content
-					-	[codeblock(doll)::
-							[sometag]
+			-	=	no-arg & no-content
+				-	[codeblock::
+						[sometag]
+					]
+				-	invokes [code:sometag], does not provide an argument or any content
+
+			-	=	arg & no-content
+				-	[codeblock::
+						[sometag(argument that can have any non-parenthesis tokens in it)]
+					]
+				-	invokes [code:sometag], providing the argument text, but no content
+
+			-	=	no-arg & content
+				-	[codeblock::
+						[sometag:content]
+						[sometag::
+							block content
 						]
-					-	invokes [code:sometag], does not provide an argument or any content
+					]
+				-	invokes [code:sometag], does not provide an argument, but provides content[ref(block-tags)]
 
-				-	=	arg & no-content
-					-	[codeblock(doll)::
-							[sometag(argument that can have any non-parenthesis tokens in it)]
+			-	=	arg & content
+				-	[codeblock::
+						[sometag(argument that can have any non-parenthesis tokens in it):content]
+						[sometag(argument that can have any non-parenthesis tokens in it)::
+							block content
 						]
-					-	invokes [code:sometag], providing the argument text, but no content
+					]
+				-	invokes [code:sometag], providing an argument and content[ref(block-tags)]
+		]
 
-				-	=	no-arg & content
-					-	[codeblock(doll)::
-							[sometag:content]
-							[sometag::
-								block content
-							]
-						]
-					-	invokes [code:sometag], does not provide an argument, but provides content[ref(block-tags)]
+		[def(block-tags)::
+			block tags allow far more flexibility in the content of tags, being able to put anything inside of them,
+			without markdoll interpreting it whatsoever, leaving that to that tag (including escape sequences!)
 
-				-	=	arg & content
-					-	[codeblock(doll)::
-							[sometag(argument that can have any non-parenthesis tokens in it):content]
-							[sometag(argument that can have any non-parenthesis tokens in it)::
-								block content
-							]
-						]
-					-	invokes [code:sometag], providing an argument and content[ref(block-tags)]
-			]
+			however, this requires that the content is indented one level further than the tag, to let the parser know what is and is not part of the content
+		]
+	&escape sequences
+		most parts of markdoll support escape sequences with the backslash character ([code:\\])
 
-			[def(block-tags)::
-				block tags allow far more flexibility in the content of tags, being able to put anything inside of them,
-				without markdoll interpreting it whatsoever, leaving that to that tag (including escape sequences!)
+		for example:
+		-	[code:[em:\\\]]] results in: [em:\]]
+		-	[code:[em:\\\\]] results in: [em:\\\\]
 
-				however, this requires that the content is indented one level further than the tag, to let the parser know what is and is not part of the content
-			]
-		&escape sequences
-			most parts of markdoll support escape sequences with the backslash character ([code:\\])
+		inline tags do not need to escape [em:balanced] square brackets, however
+		-	[code:[em:]\]] is [em:unbalanced] and will end early
+		-	[code:[em:[]]] is [em:balanced] and will not end early
 
-			for example:
-			-	[code:[em:\\\]]] results in: [em:\]]
-			-	[code:[em:\\\\]] results in: [em:\\\\]
+		block tags completely ignore escaping/balancing, their content is fed as-is into the tag, after the indentation of the tag + 1 has been stripped.
+		they dont have to care about escaping/balancing because the only way to terminate them is to lower the indentation again, which isnt something that could be escaped
+	&lists
+		unordered and ordered lists are also easy:
 
-			inline tags do not need to escape [em:balanced] square brackets, however
-			-	[code:[em:]\]] is [em:unbalanced] and will end early
-			-	[code:[em:[]]] is [em:balanced] and will not end early
+		[table::
+			=	=	kind
+				=	syntax
+				=	result
 
-			block tags completely ignore escaping/balancing, their content is fed as-is into the tag, after the indentation of the tag + 1 has been stripped.
-			they dont have to care about escaping/balancing because the only way to terminate them is to lower the indentation again, which isnt something that could be escaped
-		&lists
-			unordered and ordered lists are also easy:
-
-			[table::
-				=	=	kind
-					=	syntax
-					=	result
-
-				-	=	unordered
-					-	[codeblock(doll)::
-							-	single line
-							-	[em:can also include formatting]
-							-	lists can also
-								span multiple lines
-								if the same indent is kept
-						]
-					-	-	single line
+			-	=	unordered
+				-	[codeblock::
+						-	single line
 						-	[em:can also include formatting]
 						-	lists can also
 							span multiple lines
 							if the same indent is kept
+					]
+				-	-	single line
+					-	[em:can also include formatting]
+					-	lists can also
+						span multiple lines
+						if the same indent is kept
 
-				-	=	ordered
-					-	[codeblock(doll)::
-							=	single line
-							=	[em:can also include formatting]
-							=	lists can also
-								span multiple lines
-								if the same indent is kept
-						]
-					-	=	single line
+			-	=	ordered
+				-	[codeblock::
+						=	single line
 						=	[em:can also include formatting]
 						=	lists can also
 							span multiple lines
 							if the same indent is kept
-			]
-		&sections
-			a section is preceded by a heading, and its content is indented 1 level higher
+					]
+				-	=	single line
+					=	[em:can also include formatting]
+					=	lists can also
+						span multiple lines
+						if the same indent is kept
+		]
+	&sections
+		a section is preceded by a heading, and its content is indented 1 level higher
 
-			[table::
-				=	=	syntax
-					=	result
+		[table::
+			=	=	syntax
+				=	result
 
-				-	-	[codeblock(doll)::
-							&hello
-								&world
-									content
-								goes
-							here
-						]
-					-	&hello
+			-	-	[codeblock::
+						&hello
 							&world
 								content
 							goes
 						here
-			]
+					]
+				-	&hello
+						&world
+							content
+						goes
+					here
+		]
 
-			when emitting to HTML, it is not recommended to have more than one top-level section,
-			as multiple h1 elements causes accessibility issues
-		&frontmatter
-			markdoll differentiates between parsing as a [em:document] and everything else:
-			-	each tag parses its content as embedded markdoll source, so frontmatter would not be parsed in these situations
-			-	but when parsing a main document via [code:parse_document], frontmatter is permitted.
+		when emitting to HTML, it is not recommended to have more than one top-level section,
+		as multiple h1 elements causes accessibility issues
+	&frontmatter
+		markdoll differentiates between parsing as a [em:document] and everything else:
+		-	each tag parses its content as embedded markdoll source via [code:parse_embedded], so frontmatter would not be parsed in these situations
+		-	but when parsing a main document via [code:parse_document], frontmatter is permitted.
 
-			frontmatter works almost identically to the way it does in many other markup languages,
-			with an optional section at the very beginning of a file that is fenced with [code:---]:
+		frontmatter works almost identically to the way it does in many other markup languages,
+		with an optional section at the very beginning of a file that is fenced with [code:---]:
 
-			[codeblock(doll)::
-				---
-				whatever
-				---
+		[codeblock::
+			---
+			whatever
+			---
 
-				normal content goes here
-			]
+			normal content goes here
+		]
 
-			while many parsers choose to parse frontmatter as [link(https://yaml.org/):YAML] or [link(https://toml.io/):TOML],
-			markdoll does not wish to take part in the war between the two, and just returns it as a string
-	&extensibility
-		markdoll and its standard library emits HTML by default, but it doesn't have to!
+		while some languages choose to parse frontmatter as [link(https://yaml.org/):YAML] or [link(https://toml.io/):TOML],
+		markdoll does not wish to take part in the war between the two, and just returns it as a string
+&extensibility
+	markdoll and its standard library emits HTML by default, but it doesn't have to!
 
-		markdoll does not load [em:any] tags automatically, all of them must be manually inserted.
-		the standard library all supports HTML by default, and can be extended with other targets
+	markdoll does not load [em:any] tags automatically, all of them must be manually inserted.
+	the standard library all supports HTML by default, and can be extended with other targets
 
-		&standard extensions
-			the standard library is in the [code:markdoll::ext] module
+	&standard extensions
+		the standard library is in the [code:markdoll::ext] module
 
-			&common
-				in module [code:markdoll::ext::common]
+		&common
+			in module [code:markdoll::ext::common]
 
-				[table::
-					=	=	tag
-						=	import
-						=	description
-						=	syntax
-						=	result
+			[table::
+				=	=	tag
+					=	description
+					=	syntax
+					=	result
 
-					-	[tc(head)(rows=2):[code://]]
-						[tc(rows=2):[code:comment::tag]]
-						[tc(rows=2):the comment tag is very simple, its content is not parsed and is excluded from the output]
-						-	[codeblock(doll)::
-								[//:this will not be included in the output]
-							]
-						-	[//:this will not be included in the output]
-					-	-	[codeblock(doll)::
-								[//::
-									this more complicated block comment will not be included in the output
-
-									whatsoever
-								]
-							]
-						-	[//::
-								this more complicated block comment will not be included in the output
-
-								whatsoever
-							]
-				]
-			&formatting
-				in module [code:markdoll::ext::formatting]
-
-				[table::
-					=	=	tag
-						=	import
-						=	description
-						=	syntax
-						=	result
-
-					-	[tc(head)(rows=8):[code:em]]
-						[tc(rows=8):[code:em::tag]]
-						[tc(rows=8)::
-							apply one or more forms of emphasis to the content
-
-							flags:
-							-	i\
-								italics via `<em>`\
-								**default if no flags are specified**
-							-	b\
-								bold via `<strong>`
-							-	u\
-								underline via `<u>`
-							-	s\
-								strikethrough via `<s>`
-							-	h\
-								highlight via `<mark>`
-							-	q\
-								quote via `<q>`
+				-	=	[code://]
+					-	the comment tag is very simple, its content is not parsed and is excluded from the output
+					-	[codeblock::
+							[//:this will not be included in the output]
 						]
-						-	[codeblock(doll):[em:italics]]
-						-	[em:italics]
-					-	-	[codeblock(doll):[em(i):italics (explicit)]]
-						-	[em(i):italics (explicit)]
-					-	-	[codeblock(doll):[em(b):bold]]
-						-	[em(b):bold]
-					-	-	[codeblock(doll):[em(u):underline]]
-						-	[em(u):underline]
-					-	-	[codeblock(doll):[em(s):strikethrough]]
-						-	[em(s):strikethrough]
-					-	-	[codeblock(doll):[em(h):highlight]]
-						-	[em(h):highlight]
-					-	-	[codeblock(doll):[em(q):quote]]
-						-	[em(q):quote]
-					-	-	[codeblock(doll):[em(i)(b)(u)(s)(h)(q):everything]]
-						-	[em(i)(b)(u)(s)(h)(q):everything]
+					-	[//:this will not be included in the output]
+			]
+		&formatting
+			in module [code:markdoll::ext::formatting]
 
-					-	[tc(head)(rows=2):[code:quote]]
-						[tc(rows=2):[code:quote::tag]]
-						[tc(rows=2)::
-							block quotes
+			[table::
+				=	=	tag
+					=	description
+					=	syntax
+					=	result
 
-							an optional cite argument may be provided
-						]
-						-	[codeblock(doll)::
-								[quote::
-									block quotes can contain [em:markdoll]
-								]
-							]
-						-	[quote::
+				-	[tc(head)(rows=8):[code:em]]
+					[tc(rows=8)::
+						apply one or more forms of emphasis to the content
+
+						flags:
+						-	i\
+							italics\
+							[em:default if no flags are specified]
+						-	b\
+							bold
+						-	u\
+							underline
+						-	s\
+							strikethrough
+						-	h\
+							highlight
+						-	q\
+							quote
+					]
+					-	[codeblock:[em:italics]]
+					-	[em:italics]
+				-	-	[codeblock:[em(i):italics (explicit)]]
+					-	[em(i):italics (explicit)]
+				-	-	[codeblock:[em(b):bold]]
+					-	[em(b):bold]
+				-	-	[codeblock:[em(u):underline]]
+					-	[em(u):underline]
+				-	-	[codeblock:[em(s):strikethrough]]
+					-	[em(s):strikethrough]
+				-	-	[codeblock:[em(h):highlight]]
+					-	[em(h):highlight]
+				-	-	[codeblock:[em(q):quote]]
+					-	[em(q):quote]
+				-	-	[codeblock:[em(i)(b)(u)(s)(h)(q):everything]]
+					-	[em(i)(b)(u)(s)(h)(q):everything]
+
+				-	[tc(head)(rows=2):[code:quote]]
+					[tc(rows=2)::
+						block quotes
+
+						an optional cite argument may be provided
+					]
+					-	[codeblock::
+							[quote::
 								block quotes can contain [em:markdoll]
 							]
-					-	-	[codeblock(doll)::
-								[quote(citation goes here)::
-									block quotes can contain [em:markdoll]
-								]
-							]
-						-	[quote(citation goes here)::
+						]
+					-	[quote::
+							block quotes can contain [em:markdoll]
+						]
+				-	-	[codeblock::
+							[quote(citation goes here)::
 								block quotes can contain [em:markdoll]
 							]
-				]
-			&code
-				in module [code:markdoll::ext::code]
-
-				[table::
-					=	=	tag
-						=	import
-						=	description
-						=	syntax
-						=	result
-
-					-	=	[code:code]
-						-	[code:code::tag]
-						-	inline code blocks
-						-	[codeblock:[code:whatever code goes here, it is not [parsed] whatsoever]]
-						-	[code:whatever code goes here, it is not [parsed] whatsoever]
-
-					-	[tc(head)(rows=2):[code:codeblock]]
-						[tc(rows=2):[code:codeblock::tag]]
-						[tc(rows=2)::
-							code blocks with an optional language code
-
-							each emit target that implements this tag chooses how to handle the language code
-
-							the default HTML target uses the `html_emit.code_block_format` map to find a function to render each language
 						]
-						-	[codeblock(doll)::
-								[codeblock::
-									anything can go here :3
-								]
-							]
-						-	[codeblock::
+					-	[quote(citation goes here)::
+							block quotes can contain [em:markdoll]
+						]
+			]
+		&code
+			in module [code:markdoll::ext::code]
+
+			[table::
+				=	=	tag
+					=	description
+					=	syntax
+					=	result
+
+				-	=	[code:code]
+					-	inline code blocks
+					-	[codeblock:[code:whatever code goes here, it is not [parsed]]]
+					-	[code:whatever code goes here, it is not [parsed]]
+
+				-	=	[code:codeblock]
+					-	multi-line code blocks
+					-	[codeblock::
+							[codeblock::
 								anything can go here :3
 							]
-					-	-	[codeblock(doll)::
-								[codeblock(doll)::
-									anything can go here :3
-								]
-							]
-						-	[codeblock(doll)::
-								anything can go here :3
-							]
-				]
-			&links
-				in module [code:markdoll::ext::links]
-
-				[table::
-					=	=	tag
-						=	import
-						=	description
-						=	syntax
-						=	result
-
-					-	=	[code:link]
-						-	[code:link::tag]
-						-	link to content
-						-	[codeblock:[link(https://github.com/0x57e11a/markdoll):markdoll]]
-						-	[link(https://github.com/0x57e11a/markdoll):markdoll]
-
-					-	=	[code:img]
-						-	[code:img::tag]
-						-	insert images
-						-	[codeblock:[img(https://raw.githubusercontent.com/0x57e11a/markdoll/main/button.png):alt text goes here (88x31 button that says MADE WITH MARKDOLL)]]
-						-	[img(https://raw.githubusercontent.com/0x57e11a/markdoll/main/button.png):alt text goes here (88x31 button that says MADE WITH MARKDOLL)]
-
-					-	=	[code:def]
-						-	[code:def::tag]
-						-	in-page anchors to be used with the [code:ref] tag
-
-							defines the `ref-<id>` HTML id, replacing `<id>` with the id argument
-						-	[codeblock:[def(def-tag):this is a definition for def-tag using the def tag, maybe a bit meta?]]
-						-	[def(def-tag):this is a definition for def-tag using the def tag, maybe a bit meta?]
-
-					-	=	[code:ref]
-						-	[code:ref::tag]
-						-	link to an anchor defined by the [code:def] tag
-
-							links to the `ref-<id>` HTML id, replacing `<id>` with the id argument
-						-	[codeblock:this is a reference[ref(def-tag)]]
-						-	this is a reference[ref(def-tag)]
-				]
-			&table
-				in module [code:markdoll::ext::table]
-
-				[table::
-					=	=	tag
-						=	import
-						=	description
-						=	syntax
-						=	result
-
-					-	[tc(head)(rows=2):[code:table]]
-						[tc(rows=2):[code:table::tag]]
-						[tc(rows=2)::
-							tables
-
-							tables have two syntaxes (that can be mix-matched, even within eachother):
-							-	list syntax\
-								unordered list elements define normal rows/cells, ordered lists define head rows/cells\
-								[em:cannot create cells that span multiple rows/columns, use tags for that]
-							-	tag syntax\
-								using [code:tr]/[code:tc] tags and their arguments/flags
 						]
-						-	[codeblock::
-								[table::
-									=	=	r1c1
-										=	r1c2
-										=	r1c3
+					-	[codeblock::
+							anything can go here :3
+						]
+			]
+		&links
+			in module [code:markdoll::ext::links]
 
-									-	=	r2c1
-										-	r2c2
-										-	r2c3
+			[table::
+				=	=	tag
+					=	description
+					=	syntax
+					=	result
 
-									-	=	r3c1
-										-	r3c2
-										-	r3c3
-								]
+				-	=	[code:link]
+					-	link to content
+					-	[codeblock:[link(https://codeberg.org/0x57e11a/markdoll):markdoll]]
+					-	[link(https://codeberg.org/0x57e11a/markdoll):markdoll]
+
+				-	=	[code:img]
+					-	insert images
+					-	[codeblock::
+							[img(https://codeberg.org/0x57e11a/markdoll/raw/branch/main/button.png)::
+								alt text goes here (88x31 button that says MADE WITH MARKDOLL)
 							]
-						-	[table::
+						]
+					-	[img(https://codeberg.org/0x57e11a/markdoll/raw/branch/main/button.png)::
+							alt text goes here (88x31 button that says MADE WITH MARKDOLL)
+						]
+
+				-	=	[code:anchor]
+					-	invisible anchors to be used with the [code:ref] tag (ideal for section heads)
+					-	[codeblock:[anchor(anchor-tag)]]
+					-	[anchor(anchor-tag)]
+
+				-	=	[code:def]
+					-	in-page anchors to be used with the [code:ref] tag
+					-	[codeblock:[def(def-tag):some definition]]
+					-	[def(def-tag):some definition]
+
+				-	=	[code:ref]
+					-	link to an anchor defined by the [code:def] tag
+					-	[codeblock:this is a reference[ref(def-tag)][ref(anchor-tag)]]
+					-	this is a reference[ref(def-tag)][ref(anchor-tag)]
+			]
+		&table
+			in module [code:markdoll::ext::table]
+
+			[table::
+				=	=	tag
+					=	description
+					=	syntax
+					=	result
+
+				-	[tc(head)(rows=2):[code:table]]
+					[tc(rows=2)::
+						tables
+
+						tables have two syntaxes (that can be mix-matched, even within eachother):
+						-	list syntax
+
+							unordered list elements define normal rows/cells, ordered lists define head rows/cells\
+							[em:cannot create cells that span multiple rows/columns, use tags for that]
+						-	tag syntax
+
+							using [code:tr]/[code:tc] tags and their arguments/flags
+					]
+					-	[codeblock::
+							[table::
 								=	=	r1c1
 									=	r1c2
 									=	r1c3
@@ -399,28 +352,22 @@ awawa!
 									-	r3c2
 									-	r3c3
 							]
-					-	-	[codeblock::
-								[table::
-									[tr(head)::
-										[tc(head):r1c1]
-										[tc(head):r1c2]
-										[tc(head):r1c3]
-									]
+						]
+					-	[table::
+							=	=	r1c1
+								=	r1c2
+								=	r1c3
 
-									[tr::
-										[tc(head):r2c1]
-										[tc:r2c2]
-										[tc:r2c3]
-									]
+							-	=	r2c1
+								-	r2c2
+								-	r2c3
 
-									[tr::
-										[tc(head):r3c1]
-										[tc:r3c2]
-										[tc:r3c3]
-									]
-								]
-							]
-						-	[table::
+							-	=	r3c1
+								-	r3c2
+								-	r3c3
+						]
+				-	-	[codeblock::
+							[table::
 								[tr(head)::
 									[tc(head):r1c1]
 									[tc(head):r1c2]
@@ -439,84 +386,98 @@ awawa!
 									[tc:r3c3]
 								]
 							]
-
-					-	[tc(head)(rows=2):[code:tr]]
-						[tc(rows=2):[code:tr::tag]]
-						[tc(rows=2)::
-							create table rows inside tables
-
-							pass the [code:head] flag to insert it into the head section
 						]
-						-	[codeblock::
-								[table::
-									[tr::
-										[tc:cells go here, whether by list or tag syntax]
-									]
-								]
+					-	[table::
+							[tr(head)::
+								[tc(head):r1c1]
+								[tc(head):r1c2]
+								[tc(head):r1c3]
 							]
-						-	[table::
+
+							[tr::
+								[tc(head):r2c1]
+								[tc:r2c2]
+								[tc:r2c3]
+							]
+
+							[tr::
+								[tc(head):r3c1]
+								[tc:r3c2]
+								[tc:r3c3]
+							]
+						]
+
+				-	[tc(head)(rows=2):[code:tr]]
+					[tc(rows=2)::
+						create table rows inside tables
+
+						pass the [code:head] flag to insert it into the head section
+					]
+					-	[codeblock::
+							[table::
 								[tr::
 									[tc:cells go here, whether by list or tag syntax]
 								]
 							]
-					-	-	[codeblock::
-								[table::
-									[tr(head)::
-										[tc(head):cells go here, they should be [code:head] cells, whether by list or tag syntax]
-									]
-								]
-							]
-						-	[table::
-								[tr(head)::
-									[tc(head):cells go here, they should be [code:head] cells, whether by list or tag syntax]
-								]
-							]
-
-					-	[tc(head)(rows=4):[code:tc]]
-						[tc(rows=4):[code:tc::tag]]
-						[tc(rows=4)::
-							create table cells inside table rows
-
-							pass the [code:head] flag to make it a head cell
-
-							set the [code:rows]/[code:cols] props to make cells that span multiple rows/columns
 						]
-						-	[codeblock::
-								[table::
-									[tr::
-										[tc:content]
+					-	[table::
+							[tr::
+								[tc:cells go here, whether by list or tag syntax]
+							]
+						]
+				-	-	[codeblock::
+							[table::
+								[tr(head)::
+									[tc(head)::
+										cells go here, they should be [code:head] cells,
+										whether by list or tag syntax
 									]
 								]
 							]
-						-	[table::
+						]
+					-	[table::
+							[tr(head)::
+								[tc(head)::
+									cells go here, they should be [code:head] cells,
+									whether by list or tag syntax
+								]
+							]
+						]
+
+				-	[tc(head)(rows=4):[code:tc]]
+					[tc(rows=4)::
+						create table cells inside table rows
+
+						pass the [code:head] flag to make it a head cell
+
+						set the [code:rows]/[code:cols] props to make cells that span multiple rows/columns
+					]
+					-	[codeblock::
+							[table::
 								[tr::
 									[tc:content]
 								]
 							]
-					-	-	[codeblock::
-								[table::
-									[tr::
-										[tc(head):content]
-									]
-								]
+						]
+					-	[table::
+							[tr::
+								[tc:content]
 							]
-						-	[table::
+						]
+				-	-	[codeblock::
+							[table::
 								[tr::
 									[tc(head):content]
 								]
 							]
-					-	-	[codeblock::
-								[table::
-									[tr::
-										[tc(rows=2):two rows]
-										[tc:upper]
-									]
-									[tr::
-										[tc:lower]
-									]
-								]
+						]
+					-	[table::
+							[tr::
+								[tc(head):content]
 							]
-						-	[table::
+						]
+				-	-	[codeblock::
+							[table::
 								[tr::
 									[tc(rows=2):two rows]
 									[tc:upper]
@@ -525,18 +486,18 @@ awawa!
 									[tc:lower]
 								]
 							]
-					-	-	[codeblock::
-								[table::
-									[tr::
-										[tc(cols=2):two cols]
-									]
-									[tr::
-										[tc:left]
-										[tc:right]
-									]
-								]
+						]
+					-	[table::
+							[tr::
+								[tc(rows=2):two rows]
+								[tc:upper]
 							]
-						-	[table::
+							[tr::
+								[tc:lower]
+							]
+						]
+				-	-	[codeblock::
+							[table::
 								[tr::
 									[tc(cols=2):two cols]
 								]
@@ -545,5 +506,15 @@ awawa!
 									[tc:right]
 								]
 							]
-				]
-	[link(https://github.com/0x57e11a/markdoll):[img(https://raw.githubusercontent.com/0x57e11a/markdoll/main/button.png):MADE WITH MARKDOLL]]
+						]
+					-	[table::
+							[tr::
+								[tc(cols=2):two cols]
+							]
+							[tr::
+								[tc:left]
+								[tc:right]
+							]
+						]
+			]
+[link(https://codeberg.org/0x57e11a/markdoll):[img(https://codeberg.org/0x57e11a/markdoll/raw/branch/main/button.png):MADE WITH MARKDOLL]]
