@@ -1,6 +1,6 @@
 [package]
 name = "markdoll"
-version = "3.0.3"
+version = "4.0.0"
 authors = ["0x57e11a"]
 edition = "2021"
 description = "a structured and extensible markup language"
@@ -17,9 +17,9 @@ tracing = "0.1"
 tyfling = "0.1.3"
 miette = { version = "7.5.0", features = ["fancy"] }
 thiserror = "2.0.12"
-spanner = { path = "../spanner", features = ["miette"] }
+spanner = { version = "0.2.0", features = ["miette"] }
 hashbrown = "0.15.2"
-clap = { version = "4.5.35", features = ["derive"] }
+clap = { version = "4.5.36", features = ["derive"] }
 
 tracing-subscriber = { version = "0.3.19", optional = true }
 tracing-fancytree = { version = "0.1.0", optional = true }
