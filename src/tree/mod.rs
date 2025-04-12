@@ -32,7 +32,7 @@ impl TagInvocation {
 			.expect("tag not defined, this should've been handled by the parser");
 
 		if let Some(emit) = def.emitters.get::<To>() {
-			emit(doll, to, ctx, &mut self.content, self.name);
+			emit(doll, to, ctx, &mut *self.content, self.name);
 		} else {
 			let acceptable = AcceptableTagEmitTargets(def.emitters.type_names().collect());
 			let (at, context) = doll.resolve_span(self.name);
