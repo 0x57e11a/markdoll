@@ -2,6 +2,7 @@ use {
 	::clap::{Parser, Subcommand},
 	::markdoll::{emit::html::HtmlEmit, ext, MarkDoll},
 	::miette::Report,
+	::serde_json::json,
 	::std::io::Read,
 	::tracing::error_span,
 };
@@ -11,6 +12,19 @@ use {
 struct Cli {
 	#[command(subcommand)]
 	command: Command,
+	/// emit machine-readable JSON information to stderr
+	///
+	/// refer to the json output section of the readme for details
+	#[arg(long, global = true)]
+	json: bool,
+	/// do not emit status updates
+	#[arg(long, global = true)]
+	no_status: bool,
+	/// always complete all stages
+	///
+	/// not recommended, as the state after an error occurs is not defined
+	#[arg(long, global = true)]
+	idc: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -19,6 +33,21 @@ enum Command {
 	Check,
 	/// convert the provided stdin to html and output to stdout
 	Convert,
+}
+
+fn status_update(stage: &'static str, status: &'static str, json: bool) {
+	if json {
+		eprintln!(
+			"{}",
+			json!({
+				"kind": "status-update",
+				"stage": stage,
+				"status": status,
+			})
+		);
+	} else {
+		eprintln!("[{stage}] {status}");
+	}
 }
 
 fn main() {
@@ -44,61 +73,108 @@ fn main() {
 	doll.add_tags(ext::all_tags());
 	doll.builtin_emitters.put(HtmlEmit::default_emitters());
 
-	eprintln!("[parse] parsing...");
+	if !args.no_status {
+		status_update("parse", "working", args.json);
+	}
 
 	let (mut ok, mut diagnostics, _, mut ast) = doll.parse_document("stdin".to_string(), src, None);
 
-	if ok {
-		eprintln!("[parse] complete!");
+	if !args.no_status {
+		status_update("parse", if ok { "success" } else { "failure" }, args.json);
+	}
 
+	if ok || args.idc {
 		if let Command::Convert = args.command {
 			let mut out = HtmlEmit {
 				write: String::new(),
 				section_level: 1,
 			};
 
-			eprintln!("[emit] emitting...");
+			if !args.no_status {
+				status_update("emit", "working", args.json);
+			}
 
 			let (emit_ok, mut emit_diagnostics) = doll.emit(&mut ast, &mut out, &mut ());
 			diagnostics.append(&mut emit_diagnostics);
+			ok &= emit_ok;
 
-			if emit_ok {
-				eprintln!("[emit] complete!");
-				eprintln!("[emit] writing output to stdout...");
+			if !args.no_status {
+				status_update(
+					"emit",
+					if emit_ok { "success" } else { "failure" },
+					args.json,
+				);
+			}
 
+			if ok || args.idc {
 				print!("{}", out.write);
 
-				eprintln!("[emit] output written!");
-			} else {
-				eprintln!("[emit] failed");
-
-				ok = false;
+				if !args.no_status {
+					status_update("emit", "written", args.json);
+				}
 			}
 		}
-	} else {
-		eprintln!("[parse] failed");
 	}
-
-	eprintln!("diagnostics");
 
 	let source = doll.finish();
-	let mut reports = Vec::new();
+	// let report = Report::from(diagnostic).with_source_code(source.clone());
+	// report.labels().unwrap().map(|a| a.)
 
-	for diagnostic in diagnostics {
-		let _traced = error_span!("diagnostic", ?diagnostic).entered();
+	if args.json {
+		eprintln!(
+			"{}",
+			json!({
+				"kind": "diagnostics",
+				"diagnostics": diagnostics.into_iter().map(|diagnostic| {
+					let _traced = error_span!("diagnostic", ?diagnostic).entered();
 
-		let report = Report::from(diagnostic).with_source_code(source.clone());
-		reports.push(format!("{report:?}"));
-	}
+					let report = Report::from(diagnostic).with_source_code(source.clone());
 
-	for report in reports {
-		eprintln!("{report}");
-	}
+					json!({
+						"message": report.to_string(),
+						"code": report.code().map(|code| code.to_string()),
+						"severity": match report.severity() {
+							Some(::miette::Severity::Advice) => "advice",
+							Some(::miette::Severity::Warning) => "warning",
+							Some(::miette::Severity::Error) | None => "error",
+						},
+						"help": report.help().map(|code| code.to_string()),
+						"url": report.url().map(|code| code.to_string()),
+						"labels": report.labels().map(|labels| labels.map(|label| {
+							if let Some(src) = report.source_code() {
+								if let Ok(span) = src.read_span(label.inner(), 0, 0) {
+									return json!({
+										"primary": label.primary(),
+										"label": label.label(),
+										"location": format!("{}:{}:{}", span.name().unwrap_or("<unknown>"), span.line() + 1, span.column() + 1),
+									});
+								}
+							}
 
-	if ok {
-		eprintln!("end");
+							json!({
+								"primary": label.primary(),
+								"label": label.label(),
+								"location": "unknown",
+							})
+						}).collect::<Vec<_>>()),
+						"cause_chain": report.chain().map(|cause| cause.to_string()).collect::<Vec<_>>(),
+						"rendered": format!("{report:?}"),
+					})
+				}).collect::<Vec<_>>()
+			})
+		);
 	} else {
-		eprintln!("failed");
+		for diagnostic in diagnostics {
+			let _traced = error_span!("diagnostic", ?diagnostic).entered();
+
+			eprintln!(
+				"{:?}",
+				Report::from(diagnostic).with_source_code(source.clone())
+			);
+		}
+	}
+
+	if !ok {
 		::std::process::exit(1);
 	}
 }
