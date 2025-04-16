@@ -71,6 +71,10 @@ fn main() {
 
 	let mut doll = MarkDoll::new();
 	doll.add_tags(ext::all_tags());
+	#[cfg(feature = "danger")]
+	{
+		doll.add_tags(ext::danger::tags());
+	}
 	doll.builtin_emitters.put(HtmlEmit::default_emitters());
 
 	if !args.no_status {

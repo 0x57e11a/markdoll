@@ -2,6 +2,8 @@
 
 pub mod code;
 pub mod common;
+#[cfg(feature = "danger")]
+pub mod danger;
 pub mod formatting;
 pub mod links;
 pub mod table;
@@ -318,7 +320,7 @@ pub enum TagInputDiagnostic {
 	},
 }
 
-/// all the tags defined in the standard library
+/// all the tags defined in the standard library, excluding the [danger] tags
 #[must_use]
 pub fn all_tags<Ctx>() -> impl IntoIterator<Item = TagDefinition<Ctx>> {
 	code::tags()

@@ -517,4 +517,21 @@ markdoll is an extensible markup language written in rust, made: by dolls, for d
 							]
 						]
 			]
+	&danger zone
+		by enabling the crate feature [code:danger], the [code:ext::danger] module becomes available for use, and is automatically loaded into the default binary
+
+		this contains potentially dangerous tags, proceed with caution
+
+		[table::
+			=	=	tag
+				=	description
+				=	syntax
+
+			-	=	[code:invoke]
+				-	invoke an external command, passing arguments as cli args, content as stdin, dumping stdout into the output stream
+				-	[codeblock::
+						[invoke(./test.sh)(flip):hello world]
+					]
+					[em:imagine [code:test.sh] sees the [code:flip] argument and returns a version of stdin with all the letters flipped around]
+		]
 [link(https://codeberg.org/0x57e11a/markdoll):[img(https://codeberg.org/0x57e11a/markdoll/raw/branch/main/button.png):MADE WITH MARKDOLL]]
