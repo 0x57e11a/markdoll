@@ -91,8 +91,7 @@ impl TagDiagnosticTranslation {
 					match line.get(ind) {
 						Some('\t') => ind += 1,
 						Some('-' | '=') => ind += 2,
-						None => {}
-						_ => unreachable!(),
+						_ => {}
 					}
 				}
 
